@@ -1,0 +1,30 @@
+{
+  "name": "jira-api-wrapper",
+  "version": "1.0.0",
+  "description": "Type-safe TypeScript wrapper for Jira REST API v3",
+  "main": "dist/index.js",
+  "types": "dist/index.d.ts",
+  "scripts": {
+    "build": "tsc",
+    "prepublishOnly": "npm run build"
+  },
+  "keywords": [
+    "jira",
+    "atlassian",
+    "api",
+    "typescript",
+    "rest"
+  ],
+  "author": "",
+  "license": "MIT",
+  "dependencies": {
+    "dotenv": "^16.4.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.0.0",
+    "typescript": "^5.7.0"
+  },
+  "engines": {
+    "node": ">=18.0.0"
+  }
+}
