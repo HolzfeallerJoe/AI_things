@@ -14,6 +14,8 @@ import com.getcapacitor.PluginMethod
 import com.getcapacitor.annotation.ActivityCallback
 import com.getcapacitor.annotation.CapacitorPlugin
 import rikka.shizuku.Shizuku
+import java.net.Inet4Address
+import java.net.NetworkInterface
 import java.util.Timer
 import java.util.TimerTask
 
@@ -107,6 +109,60 @@ class WifiSoundPlugin : Plugin() {
 
         pendingShizukuCall = call
         ShizukuHelper.requestPermission(SHIZUKU_PERMISSION_REQUEST_CODE)
+    }
+
+    // ── Network methods ──────────────────────────────────────────────
+
+    @PluginMethod
+    fun getLocalIpAddress(call: PluginCall) {
+        try {
+            val ipAddress = resolveLocalIpv4()
+            val ret = JSObject()
+            if (ipAddress != null) {
+                ret.put("ipAddress", ipAddress)
+            } else {
+                ret.put("ipAddress", JSObject.NULL)
+            }
+            call.resolve(ret)
+        } catch (e: Exception) {
+            Log.w(TAG, "getLocalIpAddress failed", e)
+            call.reject("Failed to resolve local IP: ${e.message}")
+        }
+    }
+
+    /**
+     * Enumerates [NetworkInterface]s and returns the first non-loopback
+     * IPv4 address. Prefers wlan/Wi-Fi interfaces, then falls back to any
+     * non-loopback interface (e.g. hotspot/tethering on ap/swlan).
+     */
+    private fun resolveLocalIpv4(): String? {
+        val interfaces = NetworkInterface.getNetworkInterfaces()?.toList() ?: return null
+
+        // First pass: prefer typical Wi-Fi interface names
+        val wifiPrefixes = listOf("wlan", "eth", "ap", "swlan", "rndis")
+        for (prefix in wifiPrefixes) {
+            for (iface in interfaces) {
+                if (!iface.isUp || iface.isLoopback) continue
+                if (!iface.name.startsWith(prefix)) continue
+                for (addr in iface.inetAddresses) {
+                    if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                        return addr.hostAddress
+                    }
+                }
+            }
+        }
+
+        // Second pass: any non-loopback IPv4
+        for (iface in interfaces) {
+            if (!iface.isUp || iface.isLoopback) continue
+            for (addr in iface.inetAddresses) {
+                if (addr is Inet4Address && !addr.isLoopbackAddress) {
+                    return addr.hostAddress
+                }
+            }
+        }
+
+        return null
     }
 
     // ── Host methods ────────────────────────────────────────────────

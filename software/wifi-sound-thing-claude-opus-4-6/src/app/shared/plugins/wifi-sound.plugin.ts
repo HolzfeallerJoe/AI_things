@@ -55,9 +55,16 @@ export interface HostLostEvent {
   address: string;
 }
 
+export interface LocalIpResult {
+  ipAddress: string | null;
+}
+
 // ── Plugin interface ───────────────────────────────────────────────────
 
 export interface WifiSoundPlugin {
+  // Network
+  getLocalIpAddress(): Promise<LocalIpResult>;
+
   // Shizuku
   checkShizuku(): Promise<ShizukuStatus>;
   requestShizukuPermission(): Promise<{ granted: boolean }>;
