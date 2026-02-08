@@ -1,0 +1,7 @@
+{
+  "name": "wifi-sound-thing-claude-opus-4-6",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}

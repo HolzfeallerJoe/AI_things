@@ -1,0 +1,14 @@
+.showcase-header {
+  background: rgba(16, 20, 35, 0.92);
+  border-radius: 20px;
+  margin: 0 0 1.5rem;
+  box-shadow: 0 18px 38px rgba(10, 12, 25, 0.45);
+  border: 1px solid rgba(97, 110, 255, 0.18);
+  backdrop-filter: blur(20px);
+}
+
+.showcase-header__toolbar {
+  --background: transparent;
+  padding-inline: 1.25rem;
+}
+.showcase-content {   --padding-top: 1.5rem;   --padding-bottom: 2rem;   padding-bottom: clamp(72px, 10vh, 140px); }  .highlight-list {   margin: 0 0 1rem 0;   padding-left: 1.1rem;   font-size: 0.95rem;   color: var(--ion-color-medium);    li {     margin-bottom: 0.4rem;   } }  .frame-wrapper {   border-radius: 16px;   overflow: hidden;   box-shadow: 0 16px 40px rgba(15, 18, 35, 0.32);   border: 1px solid rgba(255, 255, 255, 0.05);   background: rgba(12, 14, 22, 0.7);   position: relative;   padding-top: 60%;    iframe {     border: none;     position: absolute;     inset: 0;     width: 100%;     height: 100%;   } }  ion-card-title {   font-weight: 600; }  ion-card-subtitle {   line-height: 1.4; }  .palette-toggle {   margin: 0 1.5rem 1rem; }  .library-card__card {   border-radius: 18px;   overflow: hidden;   border: 1px solid rgba(255, 255, 255, 0.06);   transition: transform 0.2s ease, box-shadow 0.2s ease; }  .library-card__card:hover {   transform: translateY(-4px);   box-shadow: 0 24px 48px rgba(12, 14, 22, 0.45); }  .library-card__card--intro {   background: linear-gradient(135deg, rgba(120, 59, 255, 0.15), rgba(0, 184, 255, 0.12)); }  .library-card__card--tamagui {   background: linear-gradient(135deg, rgba(111, 66, 255, 0.25), rgba(33, 191, 255, 0.12)); }  .library-card__card--nebular {   background: linear-gradient(135deg, rgba(32, 45, 88, 0.85), rgba(22, 29, 66, 0.95)); }  .library-card__card--shoelace {   background: linear-gradient(140deg, rgba(30, 37, 58, 0.8), rgba(12, 18, 32, 0.92)); }  .library-card__card--daisyui {   background: linear-gradient(140deg, rgba(255, 56, 162, 0.18), rgba(10, 12, 30, 0.9)); }  .library-card__card--flowbite {   background: linear-gradient(140deg, rgba(37, 99, 235, 0.18), rgba(15, 23, 42, 0.92)); }  .theme-neon {   --ion-color-primary: #7f5bff; }  .theme-contrast {   --ion-color-primary: #00d8ff; }  .theme-pastel {   --ion-color-primary: #f472b6; }

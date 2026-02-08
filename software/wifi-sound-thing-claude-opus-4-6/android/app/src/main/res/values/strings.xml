@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">wifi-sound-thing-claude-opus-4-6</string>
+    <string name="title_activity_main">wifi-sound-thing-claude-opus-4-6</string>
+    <string name="package_name">com.wifisoundthing.claudeopus46</string>
+    <string name="custom_url_scheme">com.wifisoundthing.claudeopus46</string>
+</resources>

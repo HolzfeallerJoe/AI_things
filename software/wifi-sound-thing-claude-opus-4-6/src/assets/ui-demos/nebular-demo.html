@@ -1,0 +1,149 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Nebular Demo</title>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #1b1f3b;
+        font-family: 'Roboto', 'Segoe UI', sans-serif;
+        color: #e1e5f8;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        padding: 18px;
+      }
+
+      .card {
+        width: 100%;
+        max-width: 320px;
+        background: linear-gradient(160deg, rgba(33, 43, 79, 0.95), rgba(21, 27, 51, 0.98));
+        border-radius: 20px;
+        border: 1px solid rgba(71, 105, 255, 0.26);
+        box-shadow: 0 24px 50px rgba(22, 30, 64, 0.55);
+        padding: 26px;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.1rem;
+        font-weight: 600;
+        letter-spacing: 0.02em;
+        color: #9eb5ff;
+      }
+
+      p {
+        margin: 0.7rem 0 1.6rem;
+        font-size: 0.9rem;
+        line-height: 1.5;
+        color: rgba(225, 229, 248, 0.78);
+      }
+
+      .btn {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        gap: 0.5rem;
+        width: 100%;
+        padding: 0.8rem 1.4rem;
+        border-radius: 12px;
+        background: linear-gradient(120deg, #4f6df5, #3bc2ff);
+        border: none;
+        color: #10142b;
+        font-weight: 600;
+        font-size: 0.95rem;
+        cursor: pointer;
+        transition: box-shadow 0.18s ease, transform 0.18s ease;
+      }
+
+      .btn:hover {
+        transform: translateY(-2px);
+        box-shadow: 0 18px 28px rgba(79, 109, 245, 0.35);
+      }
+
+      .toggle {
+        margin-top: 1.4rem;
+        display: flex;
+        align-items: center;
+        gap: 0.75rem;
+      }
+
+      .toggle label {
+        position: relative;
+        display: inline-block;
+        width: 60px;
+        height: 32px;
+      }
+
+      .toggle input {
+        display: none;
+      }
+
+      .track {
+        position: absolute;
+        inset: 0;
+        background: rgba(74, 116, 255, 0.35);
+        border-radius: 999px;
+        transition: background 0.2s ease;
+      }
+
+      .thumb {
+        position: absolute;
+        height: 24px;
+        width: 24px;
+        left: 4px;
+        top: 4px;
+        background: #e1e5f8;
+        border-radius: 50%;
+        box-shadow: 0 12px 16px rgba(0, 0, 0, 0.25);
+        transition: transform 0.2s ease;
+      }
+
+      .toggle input:checked + .track {
+        background: #5ac4ff;
+      }
+
+      .toggle input:checked + .track .thumb {
+        transform: translateX(28px);
+        background: #1b1f3b;
+      }
+
+      .toggle span {
+        font-size: 0.85rem;
+        text-transform: uppercase;
+        letter-spacing: 0.08em;
+        color: rgba(158, 181, 255, 0.95);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card">
+      <h1>Nebular Mission Control</h1>
+      <p>
+        Crisp typography, layered gradients, and enterprise-ready controls make Nebular a strong pick for monitoring consoles.
+      </p>
+      <button class="btn" type="button">
+        Launch Workflow
+      </button>
+      <div class="toggle">
+        <label>
+          <input type="checkbox" />
+          <span class="track">
+            <span class="thumb"></span>
+          </span>
+        </label>
+        <span>Night shift</span>
+      </div>
+    </div>
+  </body>
+</html>

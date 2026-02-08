@@ -1,0 +1,86 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Shoelace Demo</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.17.0/cdn/themes/dark.css"
+    />
+    <script
+      type="module"
+      src="https://cdn.jsdelivr.net/npm/@shoelace-style/shoelace@2.17.0/cdn/shoelace-autoloader.js"
+    ></script>
+    <style>
+      :root {
+        color-scheme: dark;
+      }
+
+      sl-button::part(base) {
+        font-size: 0.95rem;
+      }
+
+      body {
+        margin: 0;
+        min-height: 100%;
+        background: #0d121f;
+        font-family: var(--sl-font-sans);
+        display: grid;
+        place-items: center;
+        color: var(--sl-color-neutral-0);
+        padding: 24px;
+      }
+
+      .wrap {
+        width: 100%;
+        max-width: 320px;
+        padding: 26px;
+        border-radius: 18px;
+        background: linear-gradient(150deg, rgba(30, 37, 58, 0.95), rgba(14, 18, 36, 0.92));
+        border: 1px solid rgba(83, 126, 255, 0.25);
+        box-shadow: 0 20px 45px rgba(0, 0, 0, 0.35);
+        display: grid;
+        gap: 1.3rem;
+      }
+
+      h1 {
+        margin: 0;
+        font-size: 1.2rem;
+        font-weight: 600;
+      }
+
+      p {
+        margin: 0;
+        font-size: 0.95rem;
+        line-height: 1.6;
+        color: var(--sl-color-neutral-300);
+      }
+
+      .controls {
+        display: flex;
+        flex-direction: column;
+        gap: 1rem;
+      }
+
+      sl-button::part(base) {
+        box-shadow: 0 16px 28px rgba(96, 125, 255, 0.25);
+      }
+    </style>
+  </head>
+  <body>
+    <div class="wrap">
+      <div>
+        <h1>Shoelace Elements</h1>
+        <p>Accessible Web Components ready for any framework. Drop them in and theme with CSS vars.</p>
+      </div>
+      <div class="controls">
+        <sl-button variant="primary" size="large">
+          Explore Components
+        </sl-button>
+        <sl-switch checked>
+          Enable focus ring
+        </sl-switch>
+      </div>
+    </div>
+  </body>
+</html>
