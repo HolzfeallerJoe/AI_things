@@ -1,0 +1,61 @@
+<!doctype html>
+<html lang="en" data-theme="synthwave">
+  <head>
+    <meta charset="utf-8" />
+    <title>DaisyUI Demo</title>
+    <link
+      rel="stylesheet"
+      href="https://cdn.jsdelivr.net/npm/daisyui@4.12.21/dist/full.min.css"
+    />
+    <style>
+      html,
+      body {
+        margin: 0;
+        min-height: 100%;
+      }
+
+      body {
+        display: grid;
+        place-items: center;
+        padding: 24px;
+        background: radial-gradient(circle at top, rgba(88, 40, 160, 0.7), rgba(16, 10, 38, 0.9));
+      }
+
+      .demo-card {
+        width: 100%;
+        max-width: 320px;
+      }
+
+      .demo-card .card-body {
+        gap: 1.25rem;
+      }
+
+      .toggle-row {
+        display: flex;
+        align-items: center;
+        gap: 0.8rem;
+        justify-content: space-between;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="card demo-card glass text-left">
+      <figure class="px-6 pt-6">
+        <div class="radial-progress text-primary" style="--value:86;" role="progressbar">
+          86%
+        </div>
+      </figure>
+      <div class="card-body">
+        <h2 class="card-title">DaisyUI Neon</h2>
+        <p>Tailwind-powered whimsy with dozens of themed component presets. Perfect for playful dashboards.</p>
+        <div class="card-actions justify-between">
+          <button class="btn btn-primary">Launch Synth</button>
+          <div class="toggle-row">
+            <span class="badge badge-outline badge-secondary">FX</span>
+            <input type="checkbox" class="toggle toggle-secondary" checked />
+          </div>
+        </div>
+      </div>
+    </div>
+  </body>
+</html>

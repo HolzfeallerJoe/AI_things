@@ -1,0 +1,73 @@
+<ion-content class="showcase-content" fullscreen="true" [ngClass]="['theme-' + theme]">
+  <div class="showcase-header">
+    <ion-toolbar class="showcase-header__toolbar">
+      <ion-buttons slot="start">
+        <ion-back-button defaultHref="/home"></ion-back-button>
+      </ion-buttons>
+      <ion-title>UI Library Showcase</ion-title>
+    </ion-toolbar>
+  </div>
+  <ion-grid fixed>
+    <ion-row>
+      <ion-col size="12" class="intro-card">
+        <ion-card class="library-card__card library-card__card--intro">
+          <ion-card-header>
+            <ion-card-title>Try focused UI kits</ion-card-title>
+            <ion-card-subtitle>
+              Each section embeds a tiny sample highlighting a different library's aesthetic. Buttons and toggles are interactive inside the preview panes.
+            </ion-card-subtitle>
+          </ion-card-header>
+          <ion-card-content>
+            <p>
+              These are intentionally niche choices to keep the Wi-Fi audio console from looking like stock Ionic. Use the highlights to decide which ecosystem matches your tone, then inspect the live button/toggle pair inside the demo iframe.
+            </p>
+            <ion-segment
+              class="palette-toggle"
+              [value]="theme"
+              (ionChange)="updateTheme($event.detail.value)"
+            >
+              <ion-segment-button value="neon">
+                <ion-label>Neon</ion-label>
+              </ion-segment-button>
+              <ion-segment-button value="contrast">
+                <ion-label>Contrast</ion-label>
+              </ion-segment-button>
+              <ion-segment-button value="pastel">
+                <ion-label>Pastel</ion-label>
+              </ion-segment-button>
+            </ion-segment>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+
+    <ion-row>
+      <ion-col
+        size="12"
+        sizeMd="6"
+        *ngFor="let lib of libraryDemos"
+        class="library-card"
+      >
+        <ion-card [ngClass]="['library-card__card', 'library-card__card--' + lib.id]">
+          <ion-card-header>
+            <ion-card-title>{{ lib.name }}</ion-card-title>
+            <ion-card-subtitle>{{ lib.description }}</ion-card-subtitle>
+          </ion-card-header>
+          <ion-card-content>
+            <ul class="highlight-list">
+              <li *ngFor="let item of lib.highlights">{{ item }}</li>
+            </ul>
+            <div class="frame-wrapper">
+              <iframe
+                title="{{ lib.name }} playground"
+                [src]="lib.iframeSrc"
+                loading="lazy"
+                sandbox="allow-scripts allow-same-origin"
+              ></iframe>
+            </div>
+          </ion-card-content>
+        </ion-card>
+      </ion-col>
+    </ion-row>
+  </ion-grid>
+</ion-content>

@@ -1,0 +1,679 @@
+<ion-content fullscreen="true" class="page-content">
+  <div class="page-header">
+    <ion-toolbar class="page-header__toolbar">
+      <ion-title>
+        <div class="page-header__title-block">
+          <span class="page-header__eyebrow">Mobile control theme</span>
+          <h1>Wi-Fi Audio Console</h1>
+          <p>Switch between host and client roles on any device.</p>
+        </div>
+      </ion-title>
+      <ion-buttons slot="end">
+        <ion-button
+          fill="clear"
+          routerLink="/library-showcase"
+          routerDirection="forward"
+        >
+          <ion-icon slot="start" name="color-wand-outline"></ion-icon>
+          Showcase
+        </ion-button>
+      </ion-buttons>
+    </ion-toolbar>
+    <div class="role-picker">
+      <ion-segment
+        class="role-picker__segment"
+        mode="md"
+        [value]="mode"
+        (ionChange)="onModeChange($event.detail.value)"
+      >
+        <ion-segment-button value="host">
+          <div class="role-card role-card--host">
+            <ion-icon name="radio-outline"></ion-icon>
+            <div class="role-card__copy">
+              <h3>Host</h3>
+              <p>Capture playback and broadcast it over Wi-Fi.</p>
+            </div>
+            <ion-icon
+              name="arrow-forward-outline"
+              class="role-card__chevron"
+            ></ion-icon>
+          </div>
+        </ion-segment-button>
+        <ion-segment-button value="client">
+          <div class="role-card role-card--client">
+            <ion-icon name="headset-outline"></ion-icon>
+            <div class="role-card__copy">
+              <h3>Client</h3>
+              <p>Pair headphones and tune in to your host.</p>
+            </div>
+            <ion-icon
+              name="arrow-forward-outline"
+              class="role-card__chevron"
+            ></ion-icon>
+          </div>
+        </ion-segment-button>
+      </ion-segment>
+      <div class="mode-toolbar__hint">
+        <ion-icon name="information-circle-outline"></ion-icon>
+        <span>{{ modeHint }}</span>
+      </div>
+    </div>
+  </div>
+
+  <ng-container *ngIf="mode === 'host'; else clientView">
+    <section class="section-grid">
+      <ion-card class="control-card">
+        <ion-card-header>
+          <ion-card-title>Broadcast settings</ion-card-title>
+          <ion-card-subtitle>Configure audio capture before going live</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-item lines="none" class="host-ip-indicator">
+            <ion-icon slot="start" name="planet-outline"></ion-icon>
+            <ion-label>
+              <h3>Broadcast IP</h3>
+              <ng-container *ngIf="hostNetworkInfo$ | async as hostInfo">
+                <p
+                  class="host-ip-indicator__address"
+                  *ngIf="hostInfo.ipAddress; else hostIpPending"
+                >
+                  {{ hostInfo.ipAddress }}
+                  <span
+                    *ngIf="hostInfo.connectionType"
+                    class="host-ip-indicator__connection"
+                  >
+                    - {{ hostInfo.connectionType | titlecase }}
+                  </span>
+                </p>
+                <ng-container *ngIf="hostInfo.source === 'fallback'">
+                  <ion-note>
+                    {{
+                      hostInfo.fallbackReason
+                        || 'Using default hotspot address (192.168.43.1).'
+                    }}
+                  </ion-note>
+                </ng-container>
+              </ng-container>
+              <ng-template #hostIpPending>
+                <p class="host-ip-indicator__pending">
+                  Auto detection pending. Check Wi-Fi or hotspot status.
+                </p>
+              </ng-template>
+            </ion-label>
+            <ion-button
+              size="small"
+              fill="clear"
+              slot="end"
+              (click)="refreshHostNetwork()"
+              [disabled]="refreshingHostNetwork"
+            >
+              <ion-spinner
+                *ngIf="refreshingHostNetwork"
+                slot="icon-only"
+                name="crescent"
+              ></ion-spinner>
+              <ion-icon
+                *ngIf="!refreshingHostNetwork"
+                slot="icon-only"
+                name="refresh-outline"
+              ></ion-icon>
+            </ion-button>
+          </ion-item>
+
+          <form [formGroup]="hostForm" novalidate class="form-stack">
+            <div class="preset-group">
+              <div class="preset-header">
+                <ion-label>Preset profiles</ion-label>
+                <ion-note>Use a preset, then fine-tune below.</ion-note>
+              </div>
+              <ion-segment
+                class="preset-segment"
+                [value]="hostForm.get('preset')?.value"
+                (ionChange)="handlePresetChange($event.detail.value)"
+              >
+                <ion-segment-button
+                  *ngFor="let preset of hostPresets"
+                  [value]="preset.id"
+                >
+                  <ion-label>
+                    <h3>{{ preset.name }}</h3>
+                    <p>{{ preset.description }}</p>
+                  </ion-label>
+                </ion-segment-button>
+              </ion-segment>
+            </div>
+
+            <ion-grid class="form-grid">
+              <ion-row>
+                <ion-col size="12" sizeMd="6" sizeLg="3">
+                  <ion-item>
+                    <ion-label position="stacked">Codec</ion-label>
+                    <ion-select formControlName="codec" interface="popover">
+                      <ion-select-option
+                        *ngFor="let option of codecOptions"
+                        [value]="option.value"
+                      >
+                        {{ option.label }}
+                      </ion-select-option>
+                    </ion-select>
+                  </ion-item>
+                </ion-col>
+                <ion-col size="12" sizeMd="6" sizeLg="3">
+                  <ion-item>
+                    <ion-label position="stacked">Sample rate</ion-label>
+                    <ion-select formControlName="sampleRate" interface="popover">
+                      <ion-select-option
+                        *ngFor="let rate of sampleRateOptions"
+                        [value]="rate"
+                      >
+                        {{ rate / 1000 }} kHz
+                      </ion-select-option>
+                    </ion-select>
+                  </ion-item>
+                </ion-col>
+                <ion-col size="12" sizeMd="6" sizeLg="3">
+                  <ion-item>
+                    <ion-label position="stacked">Frame size</ion-label>
+                    <ion-select formControlName="frameSize" interface="popover">
+                      <ion-select-option
+                        *ngFor="let size of frameSizeOptions"
+                        [value]="size"
+                      >
+                        {{ size }} samples
+                      </ion-select-option>
+                    </ion-select>
+                  </ion-item>
+                </ion-col>
+                <ion-col size="12" sizeMd="6" sizeLg="3">
+                  <ion-item lines="none">
+                    <ion-label position="stacked">Jitter buffer</ion-label>
+                    <ion-range
+                      formControlName="jitterBuffer"
+                      [min]="1"
+                      [max]="6"
+                      [step]="1"
+                      [snaps]="true"
+                      [ticks]="true"
+                    >
+                      <ion-label slot="start">1</ion-label>
+                      <ion-label slot="end">6</ion-label>
+                    </ion-range>
+                    <ion-note slot="helper">
+                      {{ hostForm.get('jitterBuffer')?.value }} frames
+                    </ion-note>
+                  </ion-item>
+                </ion-col>
+              </ion-row>
+              <ion-row>
+                <ion-col size="12" sizeMd="4">
+                  <ion-item>
+                    <ion-label position="stacked">Transport</ion-label>
+                    <ion-select formControlName="transportMode" interface="popover">
+                      <ion-select-option
+                        *ngFor="let option of transportOptions"
+                        [value]="option.value"
+                      >
+                        {{ option.label }}
+                      </ion-select-option>
+                    </ion-select>
+                  </ion-item>
+                </ion-col>
+                <ion-col size="12" sizeMd="4">
+                  <ion-item>
+                    <ion-label position="stacked">UDP port</ion-label>
+                    <ion-input
+                      type="number"
+                      formControlName="port"
+                      placeholder="5052"
+                    ></ion-input>
+                  </ion-item>
+                </ion-col>
+                <ion-col size="12" sizeMd="4">
+                  <ion-item>
+                    <ion-label position="stacked">Capture source</ion-label>
+                    <ion-select formControlName="captureSource" interface="popover">
+                      <ion-select-option
+                        *ngFor="let option of captureOptions"
+                        [value]="option.value"
+                      >
+                        {{ option.label }}
+                      </ion-select-option>
+                    </ion-select>
+                  </ion-item>
+                </ion-col>
+              </ion-row>
+              <ion-row>
+                <ion-col size="12" *ngIf="hostForm.get('transportMode')?.value === 'native-udp'">
+                  <ion-item>
+                    <ion-label position="stacked">Target peers (Native UDP)</ion-label>
+                    <ion-textarea
+                      [autoGrow]="true"
+                      rows="2"
+                      formControlName="peers"
+                      placeholder="Comma separated client IPs, e.g. 192.168.1.22, 192.168.1.23"
+                    ></ion-textarea>
+                  </ion-item>
+                </ion-col>
+                <ion-col size="12" sizeMd="6" *ngIf="hostForm.get('transportMode')?.value === 'webrtc'">
+                  <ion-item>
+                    <ion-label position="stacked">Signaling URL</ion-label>
+                    <ion-input
+                      type="url"
+                      formControlName="signalingUrl"
+                      placeholder="ws://192.168.1.20:8787"
+                    ></ion-input>
+                  </ion-item>
+                </ion-col>
+                <ion-col size="12" sizeMd="3" *ngIf="hostForm.get('transportMode')?.value === 'webrtc'">
+                  <ion-item>
+                    <ion-label position="stacked">Room ID</ion-label>
+                    <ion-input
+                      type="text"
+                      formControlName="roomId"
+                      placeholder="living-room"
+                    ></ion-input>
+                  </ion-item>
+                </ion-col>
+              </ion-row>
+              <ion-row>
+                <ion-col size="12" sizeMd="6">
+                  <ion-item>
+                    <ion-label position="stacked">Encryption</ion-label>
+                    <ion-select formControlName="encryption" interface="popover">
+                      <ion-select-option
+                        *ngFor="let option of encryptionOptions"
+                        [value]="option.value"
+                      >
+                        {{ option.label }}
+                      </ion-select-option>
+                    </ion-select>
+                  </ion-item>
+                </ion-col>
+                <ion-col size="12" sizeMd="6">
+                  <ion-item lines="none">
+                    <ion-label>Auto start on launch</ion-label>
+                    <ion-toggle formControlName="autoStart"></ion-toggle>
+                  </ion-item>
+                  <ion-item lines="none">
+                    <ion-label>Record local copy</ion-label>
+                    <ion-toggle formControlName="recordSession"></ion-toggle>
+                  </ion-item>
+                </ion-col>
+              </ion-row>
+            </ion-grid>
+
+            <div class="button-row">
+              <ion-button
+                type="button"
+                color="primary"
+                (click)="startHost()"
+                [disabled]="disableStartHost"
+              >
+                <ion-icon name="play-circle" slot="start"></ion-icon>
+                Start broadcast
+              </ion-button>
+              <ion-button
+                type="button"
+                color="danger"
+                fill="outline"
+                (click)="stopHost()"
+                [disabled]="disableStopHost"
+              >
+                <ion-icon name="pause-circle" slot="start"></ion-icon>
+                Pause
+              </ion-button>
+              <ion-button
+                type="button"
+                fill="clear"
+                (click)="resetHostForm()"
+              >
+                Reset to defaults
+              </ion-button>
+            </div>
+          </form>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Session metrics</ion-card-title>
+          <ion-card-subtitle>Live snapshot of the current stream</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+          <div class="stat-grid">
+            <div class="stat" *ngFor="let stat of hostStatCards">
+              <span class="stat-label">{{ stat.label }}</span>
+              <span class="stat-value">{{ stat.value }}</span>
+              <ion-note *ngIf="stat.helper">{{ stat.helper }}</ion-note>
+            </div>
+          </div>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Connected peers</ion-card-title>
+          <ion-card-subtitle>Latency and health for each listener</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-list lines="none" class="peer-list">
+            <ion-item *ngFor="let peer of connectedPeers">
+              <ion-label>
+                <h3>{{ peer.name }}</h3>
+                <p>{{ peer.address }}</p>
+              </ion-label>
+              <div class="peer-metrics">
+                <ion-badge [color]="peer.badgeColor">{{ peer.stateLabel }}</ion-badge>
+                <span>{{ peer.latencyMs }} ms  -  jitter {{ peer.jitterMs }} ms</span>
+              </div>
+            </ion-item>
+          </ion-list>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Quick tips</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-list lines="none">
+            <ion-item>
+              <ion-icon name="wifi-outline" slot="start"></ion-icon>
+              <ion-label>Prefer 5 GHz Wi-Fi and keep devices near the router for lowest jitter.</ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-icon name="code-slash-outline" slot="start"></ion-icon>
+              <ion-label>Opus delivers the best balance between latency and fidelity for speech or film.</ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-icon name="sync-outline" slot="start"></ion-icon>
+              <ion-label>Adjust frame size and jitter buffer together to avoid under-runs.</ion-label>
+            </ion-item>
+          </ion-list>
+        </ion-card-content>
+      </ion-card>
+    </section>
+  </ng-container>
+
+  <ng-template #clientView>
+    <section class="section-grid">
+      <ion-card class="control-card">
+        <ion-card-header>
+          <ion-card-title>Client controls</ion-card-title>
+          <ion-card-subtitle>Connect this device to a host broadcast</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+          <form [formGroup]="clientForm" class="form-stack" novalidate>
+            <ion-item lines="none" class="selected-host-item">
+              <ng-container *ngIf="selectedHost as host; else awaitingHost">
+                <ion-icon slot="start" name="radio-outline"></ion-icon>
+                <ion-label>
+                  <h3>{{ host.name }}</h3>
+                  <p>{{ host.address }} - {{ host.transport }} - room {{ host.roomId }}</p>
+                </ion-label>
+                <ion-chip slot="end" color="success">
+                  <ion-icon name="checkmark-circle-outline"></ion-icon>
+                  <ion-label>Ready</ion-label>
+                </ion-chip>
+              </ng-container>
+              <ng-template #awaitingHost>
+                <ion-icon slot="start" name="hourglass-outline"></ion-icon>
+                <ion-label>
+                  <h3>Waiting for a host</h3>
+                  <p>Leave auto discovery on to connect automatically.</p>
+                </ion-label>
+              </ng-template>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-label>Transport</ion-label>
+              <ion-select formControlName="transportMode" interface="popover">
+                <ion-select-option
+                  *ngFor="let option of transportOptions"
+                  [value]="option.value"
+                >
+                  {{ option.label }}
+                </ion-select-option>
+              </ion-select>
+            </ion-item>
+            <ion-item lines="none" *ngIf="clientForm.get('transportMode')?.value === 'webrtc'">
+              <ion-label>Auto discovery</ion-label>
+              <ion-toggle formControlName="discovery"></ion-toggle>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-label>Auto reconnect</ion-label>
+              <ion-toggle formControlName="autoReconnect"></ion-toggle>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-label>Drift correction</ion-label>
+              <ion-toggle formControlName="driftCorrection"></ion-toggle>
+            </ion-item>
+            <ion-item *ngIf="clientForm.get('transportMode')?.value === 'webrtc'">
+              <ion-label position="stacked">Signaling URL</ion-label>
+              <ion-input
+                type="url"
+                formControlName="signalingUrl"
+                placeholder="ws://192.168.1.20:8787"
+              ></ion-input>
+            </ion-item>
+            <ion-item *ngIf="clientForm.get('transportMode')?.value === 'native-udp'">
+              <ion-label position="stacked">Host IP (Native UDP)</ion-label>
+              <ion-input
+                type="text"
+                formControlName="hostAddress"
+                placeholder="192.168.1.20"
+              ></ion-input>
+            </ion-item>
+            <ion-item *ngIf="clientForm.get('transportMode')?.value === 'native-udp'">
+              <ion-label position="stacked">UDP port</ion-label>
+              <ion-input
+                type="number"
+                formControlName="port"
+                placeholder="5052"
+              ></ion-input>
+            </ion-item>
+            <ion-item>
+              <ion-label position="stacked">Preferred output</ion-label>
+              <ion-segment formControlName="preferredOutput">
+                <ion-segment-button *ngFor="let target of outputTargets" [value]="target.value">
+                  <ion-label>{{ target.label }}</ion-label>
+                </ion-segment-button>
+              </ion-segment>
+            </ion-item>
+            <ion-item lines="none">
+              <ion-label position="stacked">Jitter buffer</ion-label>
+              <ion-range
+                formControlName="jitterBuffer"
+                [min]="1"
+                [max]="6"
+                [step]="1"
+                [snaps]="true"
+                [ticks]="true"
+              >
+                <ion-label slot="start">1</ion-label>
+                <ion-label slot="end">6</ion-label>
+              </ion-range>
+              <ion-note slot="helper">
+                {{ clientForm.get('jitterBuffer')?.value }} frames
+              </ion-note>
+            </ion-item>
+
+            <div class="button-row">
+              <ion-button
+                type="button"
+                color="primary"
+                (click)="connectClient()"
+                [disabled]="disableConnect"
+              >
+                <ion-icon name="link" slot="start"></ion-icon>
+                Connect
+              </ion-button>
+              <ion-button
+                type="button"
+                color="medium"
+                fill="outline"
+                (click)="disconnectClient()"
+                [disabled]="disableDisconnect"
+              >
+                <ion-icon name="unlink" slot="start"></ion-icon>
+                Disconnect
+              </ion-button>
+            </div>
+          </form>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card class="discovery-card" *ngIf="showDiscoveryCard">
+        <ion-card-header>
+          <ion-card-title>Discovered hosts</ion-card-title>
+          <ion-card-subtitle>Auto-detected broadcasters on the local network</ion-card-subtitle>
+        </ion-card-header>
+        <ion-card-content>
+          <div class="discovery-actions">
+            <div class="discovery-status">
+              <ion-spinner *ngIf="discoveryInProgress" name="crescent"></ion-spinner>
+              <ion-note *ngIf="!discoveryInProgress && discoveryMessage">
+                {{ discoveryMessage }}
+              </ion-note>
+              <ion-note *ngIf="discoveryInProgress">Scanning for hosts...</ion-note>
+            </div>
+            <ion-button size="small" fill="clear" (click)="refreshDiscovery()">
+              <ion-icon slot="start" name="refresh-outline"></ion-icon>
+              Refresh
+            </ion-button>
+          </div>
+          <ion-list
+            lines="none"
+            class="discovered-hosts"
+            *ngIf="discoveredHosts.length; else noHostsTemplate"
+          >
+            <ion-item
+              button
+              detail="false"
+              *ngFor="let host of discoveredHosts"
+              (click)="selectDiscoveredHost(host)"
+              [class.selected-host]="selectedHostId === host.id"
+            >
+              <ion-icon slot="start" name="radio-outline"></ion-icon>
+              <ion-label>
+                <h3>{{ host.name }}</h3>
+                <p>
+                  {{ host.address }}  -  {{ host.transport }}  -  room {{ host.roomId }}
+                </p>
+                <ion-note>
+                  Last seen {{ host.lastSeen | date: 'shortTime' }}
+                </ion-note>
+              </ion-label>
+              <ion-badge
+                slot="end"
+                [color]="badgeColorForSignal(host.signal)"
+              >
+                {{ signalStrengthLabel(host.signal) }}
+              </ion-badge>
+            </ion-item>
+          </ion-list>
+          <ng-template #noHostsTemplate>
+            <p class="no-hosts" *ngIf="!discoveryInProgress">
+              No hosts detected yet. Ensure a broadcaster is live or refresh.
+            </p>
+            <p class="no-hosts" *ngIf="discoveryInProgress">
+              Listening for broadcast beacons...
+            </p>
+          </ng-template>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card class="status-card">
+        <ion-card-header>
+          <ion-card-title>Playback status</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-list lines="none" class="status-list">
+            <ion-item>
+              <ion-label>
+                <h3>State</h3>
+                <p>{{ clientStatus.state }}</p>
+              </ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-label>
+                <h3>Latency</h3>
+                <p>{{ clientStatus.latency }}</p>
+              </ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-label>
+                <h3>Jitter</h3>
+                <p>{{ clientStatus.jitter }}</p>
+              </ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-label>
+                <h3>Buffer</h3>
+                <p>{{ clientStatus.buffer }}</p>
+              </ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-label>
+                <h3>Codec</h3>
+                <p>{{ clientStatus.codec }}</p>
+              </ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-label>
+                <h3>Signal</h3>
+                <p>{{ clientStatus.signal }}</p>
+              </ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-label>
+                <h3>Last sync</h3>
+                <p>{{ clientStatus.lastSync }}</p>
+              </ion-label>
+            </ion-item>
+          </ion-list>
+        </ion-card-content>
+      </ion-card>
+
+      <ion-card>
+        <ion-card-header>
+          <ion-card-title>Listening tips</ion-card-title>
+        </ion-card-header>
+        <ion-card-content>
+          <ion-list lines="none">
+            <ion-item>
+              <ion-icon name="bluetooth-outline" slot="start"></ion-icon>
+              <ion-label>Pair your headphones before connecting so Android routes audio correctly.</ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-icon name="speedometer-outline" slot="start"></ion-icon>
+              <ion-label>Lower jitter buffers reduce delay but can cause dropouts on unstable Wi-Fi.</ion-label>
+            </ion-item>
+            <ion-item>
+              <ion-icon name="mic-off-outline" slot="start"></ion-icon>
+              <ion-label>Mute system notifications to avoid blasting alerts to every listener.</ion-label>
+            </ion-item>
+          </ion-list>
+        </ion-card-content>
+      </ion-card>
+    </section>
+  </ng-template>
+
+  <ion-card class="log-card">
+    <ion-card-header>
+      <ion-card-title>Event log</ion-card-title>
+    </ion-card-header>
+    <ion-card-content>
+      <ion-list lines="none">
+        <ion-item *ngFor="let log of logEntries; trackBy: trackByTimestamp">
+          <ion-icon slot="start" [name]="logIcon(log.level)" [color]="logColor(log.level)"></ion-icon>
+          <ion-label>
+            <div class="log-headline">
+              <span class="log-message">{{ log.message }}</span>
+              <ion-note>{{ log.timestamp }}</ion-note>
+            </div>
+          </ion-label>
+        </ion-item>
+      </ion-list>
+    </ion-card-content>
+  </ion-card>
+</ion-content>

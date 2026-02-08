@@ -1,0 +1,7 @@
+{
+  "name": "wifi-sound-thing-gpt-5-3-codex",
+  "integrations": {
+    "capacitor": {}
+  },
+  "type": "angular"
+}

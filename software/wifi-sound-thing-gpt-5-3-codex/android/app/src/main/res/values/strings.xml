@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">wifi-sound-thing-gpt-5-3-codex</string>
+    <string name="title_activity_main">wifi-sound-thing-gpt-5-3-codex</string>
+    <string name="package_name">com.wifisoundthing.gpt53codex</string>
+    <string name="custom_url_scheme">com.wifisoundthing.gpt53codex</string>
+</resources>
