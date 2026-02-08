@@ -861,7 +861,7 @@ export class HomePage implements OnDestroy {
     const currentIp = info.ipAddress;
     if (currentIp && currentIp !== this.lastLoggedHostIp) {
       this.lastLoggedHostIp = currentIp;
-      const via = info.source === 'plugin' ? 'detected' : 'estimated';
+      const via = info.source === 'fallback' ? 'estimated' : 'detected';
       this.pushLog('info', `Host network address ${via}: ${currentIp}.`);
       return;
     }

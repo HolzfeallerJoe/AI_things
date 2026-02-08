@@ -5,6 +5,14 @@ import { take } from 'rxjs/operators';
 import { HostNetworkService, type HostNetworkInfo } from './host-network.service';
 
 describe('HostNetworkService', () => {
+  let webRtcIpSpy: jasmine.Spy;
+
+  beforeEach(() => {
+    webRtcIpSpy = spyOn<any>(HostNetworkService.prototype, 'resolveWebRtcIpAddress').and.resolveTo(
+      null
+    );
+  });
+
   async function currentInfo(service: HostNetworkService): Promise<HostNetworkInfo> {
     return firstValueFrom(service.info$.pipe(take(1)));
   }
@@ -76,5 +84,28 @@ describe('HostNetworkService', () => {
     expect(info.source).toBe('fallback');
     expect(info.ipAddress).toBe('192.168.43.1');
     expect(info.fallbackReason).toContain('Unable to read');
+  });
+
+  it('should expose WebRTC-derived IP when plugin does not provide one', async () => {
+    spyOn(Capacitor, 'isPluginAvailable').and.returnValue(true);
+    webRtcIpSpy.and.resolveTo('192.168.1.52');
+
+    const service = new HostNetworkService();
+    spyOn<any>(service, 'loadNetworkPlugin').and.resolveTo({
+      Network: {
+        getStatus: async () =>
+          ({
+            connected: true,
+            connectionType: 'wifi',
+          }) as never,
+      },
+    });
+    await service.refresh();
+
+    const info = await currentInfo(service);
+    expect(info.source).toBe('webrtc');
+    expect(info.ipAddress).toBe('192.168.1.52');
+    expect(info.connectionType).toBe('wifi');
+    expect(info.fallbackReason).toBeUndefined();
   });
 });

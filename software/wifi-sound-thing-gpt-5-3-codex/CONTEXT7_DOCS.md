@@ -50,3 +50,14 @@
 - Angular testing docs recommend using virtual time control for `setTimeout`/`setInterval` flows instead of real delays.
 
 ---
+
+## @capacitor/network@7.0.2
+
+### Query: "Network.getStatus fields and whether local device IP is available"
+> Queried: 2026-02-08
+
+- `Network.getStatus()` returns `connected` and `connectionType` only.
+- The official `ConnectionStatus` type does not include a local IP address field.
+- Local IP retrieval needs a separate mechanism (native plugin or best-effort WebRTC candidate probing).
+
+---
