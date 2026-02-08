@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.env
+backed-projects.json
+auth.json
+browser-data/
