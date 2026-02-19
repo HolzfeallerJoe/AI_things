@@ -3,11 +3,11 @@ name: github
 description: Use this skill whenever the user asks to interact with GitHub - listing repositories, managing issues, pull requests, branches, commits, releases, workflows, or any other GitHub operations. Provides a type-safe TypeScript wrapper for the GitHub REST API.
 ---
 
-When working with GitHub, use the TypeScript wrapper located at `C:\Users\Dominik\Projects\wrapper\GitHub`.
+When working with GitHub, use the TypeScript wrapper located at `C:\Users\Dominik\Projects\Private\AI_things\wrapper\GitHub`.
 
 ## Setup
 
-The wrapper requires environment variables from `C:\Users\Dominik\Projects\wrapper\GitHub\.env`:
+The wrapper requires environment variables from `C:\Users\Dominik\Projects\Private\AI_things\wrapper\GitHub\.env`:
 - `GITHUB_TOKEN` - Personal Access Token from https://github.com/settings/tokens
 
 ## Code Pattern
@@ -16,9 +16,9 @@ The wrapper requires environment variables from `C:\Users\Dominik\Projects\wrapp
 
 ```typescript
 import { config } from 'dotenv';
-import { GitHubClient, SearchQueryBuilder } from 'C:/Users/Dominik/Projects/wrapper/GitHub/src/index.js';
+import { GitHubClient, SearchQueryBuilder } from 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/GitHub/src/index.js';
 
-config({ path: 'C:/Users/Dominik/Projects/wrapper/GitHub/.env' });
+config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/GitHub/.env' });
 
 async function main() {
   const github = new GitHubClient({
@@ -36,7 +36,7 @@ main();
 To execute GitHub scripts, write a `.ts` file in the wrapper directory and run with tsx:
 
 ```bash
-cd C:\Users\Dominik\Projects\wrapper\GitHub
+cd C:\Users\Dominik\Projects\Private\AI_things\wrapper\GitHub
 npx tsx your-script.ts
 ```
 

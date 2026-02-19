@@ -1,11 +1,9 @@
 # Dependencies
 node_modules/
 
-# Project data
-uploads/
-
 # Build output
 dist/
+build/
 coverage/
 *.tsbuildinfo
 

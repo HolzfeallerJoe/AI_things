@@ -3,11 +3,11 @@ name: jira
 description: Use this skill whenever the user asks to interact with Jira - fetching tickets, creating issues, searching, updating status, adding comments, or any other Jira operations. Provides a type-safe TypeScript wrapper for the Jira REST API.
 ---
 
-When working with Jira, use the TypeScript wrapper located at `C:\Users\Dominik\Projects\wrapper\Jira`.
+When working with Jira, use the TypeScript wrapper located at `C:\Users\Dominik\Projects\Private\AI_things\wrapper\Jira`.
 
 ## Setup
 
-The wrapper requires environment variables from `C:\Users\Dominik\Projects\wrapper\Jira\.env`:
+The wrapper requires environment variables from `C:\Users\Dominik\Projects\Private\AI_things\wrapper\Jira\.env`:
 - `JIRA_DOMAIN` - Jira Cloud domain (e.g., `ascora.atlassian.net`)
 - `JIRA_EMAIL` - Atlassian account email
 - `JIRA_API_TOKEN` - API token from https://id.atlassian.com/manage-profile/security/api-tokens
@@ -18,9 +18,9 @@ The wrapper requires environment variables from `C:\Users\Dominik\Projects\wrapp
 
 ```typescript
 import { config } from 'dotenv';
-import { JiraClient, JqlBuilder } from 'C:/Users/Dominik/Projects/wrapper/Jira/src/index.js';
+import { JiraClient, JqlBuilder } from 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Jira/src/index.js';
 
-config({ path: 'C:/Users/Dominik/Projects/wrapper/Jira/.env' });
+config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Jira/.env' });
 
 async function main() {
   const jira = new JiraClient({
@@ -40,7 +40,7 @@ main();
 To execute Jira scripts, write a `.ts` file in the wrapper directory and run with tsx:
 
 ```bash
-cd C:\Users\Dominik\Projects\wrapper\Jira
+cd C:\Users\Dominik\Projects\Private\AI_things\wrapper\Jira
 npx tsx your-script.ts
 ```
 

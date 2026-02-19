@@ -10,14 +10,14 @@ This is a type-safe TypeScript wrapper for the GitHub REST API. It provides a `G
 
 - **No top-level await**: When writing scripts, always wrap code in an `async function main()` and call `main()` at the end. The tsx runner doesn't support top-level await with CommonJS output.
 - **Authentication**: Uses Bearer token authentication with a Personal Access Token (PAT).
-- **Always load .env**: Use `config({ path: 'C:/Users/Dominik/Projects/wrapper/GitHub/.env' })` to load credentials.
+- **Always load .env**: Use `config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/GitHub/.env' })` to load credentials.
 - **API Version**: Uses `X-GitHub-Api-Version: 2022-11-28` header by default.
 
 ## Common Commands
 
 ### Running Scripts
 ```bash
-cd C:\Users\Dominik\Projects\wrapper\GitHub
+cd C:\Users\Dominik\Projects\Private\AI_things\wrapper\GitHub
 npx tsx your-script.ts
 ```
 
@@ -32,7 +32,7 @@ npm run build
 import { config } from 'dotenv';
 import { GitHubClient, SearchQueryBuilder } from './src/index.js';
 
-config({ path: 'C:/Users/Dominik/Projects/wrapper/GitHub/.env' });
+config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/GitHub/.env' });
 
 async function main() {
   const github = new GitHubClient({

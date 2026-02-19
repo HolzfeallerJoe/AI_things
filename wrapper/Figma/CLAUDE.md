@@ -10,14 +10,14 @@ This is a type-safe TypeScript wrapper for the Figma REST API. It provides a `Fi
 
 - **No top-level await**: When writing scripts, always wrap code in an `async function main()` and call `main()` at the end. The tsx runner doesn't support top-level await with CommonJS output.
 - **Authentication**: Uses `X-Figma-Token` header with a Personal Access Token.
-- **Always load .env**: Use `config({ path: 'C:/Users/Dominik/Projects/wrapper/Figma/.env' })` to load credentials.
+- **Always load .env**: Use `config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Figma/.env' })` to load credentials.
 - **File Keys**: Figma uses file keys (not full URLs) for API calls. Use `extractFileKey()` to get the key from a URL.
 
 ## Common Commands
 
 ### Running Scripts
 ```bash
-cd C:\Users\Dominik\Projects\wrapper\Figma
+cd C:\Users\Dominik\Projects\Private\AI_things\wrapper\Figma
 npx tsx your-script.ts
 ```
 
@@ -32,7 +32,7 @@ npm run build
 import { config } from 'dotenv';
 import { FigmaClient, extractFileKey } from './src/index.js';
 
-config({ path: 'C:/Users/Dominik/Projects/wrapper/Figma/.env' });
+config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Figma/.env' });
 
 async function main() {
   const figma = new FigmaClient({

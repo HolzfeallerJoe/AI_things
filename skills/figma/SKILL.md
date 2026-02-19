@@ -3,11 +3,11 @@ name: figma
 description: Use this skill whenever the user asks to interact with Figma - fetching files, exporting images, managing comments, working with components, styles, variables, or any other Figma operations. Provides a type-safe TypeScript wrapper for the Figma REST API.
 ---
 
-When working with Figma, use the TypeScript wrapper located at `C:\Users\Dominik\Projects\wrapper\Figma`.
+When working with Figma, use the TypeScript wrapper located at `C:\Users\Dominik\Projects\Private\AI_things\wrapper\Figma`.
 
 ## Setup
 
-The wrapper requires environment variables from `C:\Users\Dominik\Projects\wrapper\Figma\.env`:
+The wrapper requires environment variables from `C:\Users\Dominik\Projects\Private\AI_things\wrapper\Figma\.env`:
 - `FIGMA_ACCESS_TOKEN` - Personal Access Token from https://www.figma.com/developers/api#access-tokens
 - `FIGMA_TEAM_ID` - Team ID (for listing projects, components, styles)
 - `FIGMA_USER_ID` - User ID
@@ -18,9 +18,9 @@ The wrapper requires environment variables from `C:\Users\Dominik\Projects\wrapp
 
 ```typescript
 import { config } from 'dotenv';
-import { FigmaClient, extractFileKey } from 'C:/Users/Dominik/Projects/wrapper/Figma/src/index.js';
+import { FigmaClient, extractFileKey } from 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Figma/src/index.js';
 
-config({ path: 'C:/Users/Dominik/Projects/wrapper/Figma/.env' });
+config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Figma/.env' });
 
 async function main() {
   const figma = new FigmaClient({
@@ -38,7 +38,7 @@ main();
 To execute Figma scripts, write a `.ts` file in the wrapper directory and run with tsx:
 
 ```bash
-cd C:\Users\Dominik\Projects\wrapper\Figma
+cd C:\Users\Dominik\Projects\Private\AI_things\wrapper\Figma
 npx tsx your-script.ts
 ```
 
@@ -93,7 +93,7 @@ import {
   colorToRgba,
   findNodesByType,
   flattenNodes,
-} from 'C:/Users/Dominik/Projects/wrapper/Figma/src/index.js';
+} from 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Figma/src/index.js';
 
 // Extract file key from URL
 const fileKey = extractFileKey('https://www.figma.com/file/ABC123/MyFile');

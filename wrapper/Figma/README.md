@@ -27,7 +27,7 @@ Get your personal access token from: https://www.figma.com/developers/api#access
 import { config } from 'dotenv';
 import { FigmaClient } from './src/index.js';
 
-config({ path: 'C:/Users/Dominik/Projects/wrapper/Figma/.env' });
+config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Figma/.env' });
 
 async function main() {
   const figma = new FigmaClient({

@@ -27,7 +27,7 @@ Get your personal access token from: https://github.com/settings/tokens
 import { config } from 'dotenv';
 import { GitHubClient } from './src/index.js';
 
-config({ path: 'C:/Users/Dominik/Projects/wrapper/GitHub/.env' });
+config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/GitHub/.env' });
 
 async function main() {
   const github = new GitHubClient({

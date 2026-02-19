@@ -10,13 +10,13 @@ This is a type-safe TypeScript wrapper for the Jira Cloud REST API v3. It provid
 
 - **No top-level await**: When writing scripts, always wrap code in an `async function main()` and call `main()` at the end. The tsx runner doesn't support top-level await with CommonJS output.
 - **API Endpoint Change**: The search endpoint is `/search/jql` (not `/search`). This was updated in the Jira API - the old endpoint returns a 410 Gone error.
-- **Always load .env**: Use `config({ path: 'C:/Users/Dominik/Projects/wrapper/Jira/.env' })` to load credentials.
+- **Always load .env**: Use `config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Jira/.env' })` to load credentials.
 
 ## Common Commands
 
 ### Running Scripts
 ```bash
-cd C:\Users\Dominik\Projects\wrapper\Jira
+cd C:\Users\Dominik\Projects\Private\AI_things\wrapper\Jira
 npx tsx your-script.ts
 ```
 
@@ -31,7 +31,7 @@ npm run build
 import { config } from 'dotenv';
 import { JiraClient, JqlBuilder } from './src/index.js';
 
-config({ path: 'C:/Users/Dominik/Projects/wrapper/Jira/.env' });
+config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Jira/.env' });
 
 async function main() {
   const jira = new JiraClient({
