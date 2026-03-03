@@ -15,6 +15,19 @@ Create a `.env` file with your Figma credentials:
 
 ```env
 FIGMA_ACCESS_TOKEN=your-personal-access-token
+FIGMA_TEAM_ID=optional-team-id
+FIGMA_USER_ID=optional-user-id
+
+# Optional second profile for team vault access
+FIGMA_TEAM_VAULT_ACCESS_TOKEN=optional-team-vault-token
+FIGMA_TEAM_VAULT_TEAM_ID=optional-team-vault-team-id
+FIGMA_TEAM_VAULT_USER_ID=optional-team-vault-user-id
+
+# Optional profile switch controls:
+# FIGMA_CREDENTIAL_PROFILE=default
+# FIGMA_CREDENTIAL_PROFILE=team_vault
+# FIGMA_USE_TEAM_VAULT=false
+# FIGMA_PROMPT_CONTEXT=
 ```
 
 Get your personal access token from: https://www.figma.com/developers/api#access-tokens
@@ -25,13 +38,18 @@ Get your personal access token from: https://www.figma.com/developers/api#access
 
 ```typescript
 import { config } from 'dotenv';
-import { FigmaClient } from './src/index.js';
+import { FigmaClient, resolveFigmaCredentials } from './src/index.js';
 
 config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Figma/.env' });
 
 async function main() {
+  const creds = resolveFigmaCredentials({
+    // Optional: if this text includes "team vault", the team profile is selected.
+    promptText: 'Use team vault credentials',
+  });
+
   const figma = new FigmaClient({
-    accessToken: process.env.FIGMA_ACCESS_TOKEN!,
+    accessToken: creds.accessToken,
   });
 
   const me = await figma.getCurrentUser();
@@ -40,6 +58,12 @@ async function main() {
 
 main();
 ```
+
+Credential selection priority:
+1. `forceProfile` passed to `resolveFigmaCredentials`
+2. `FIGMA_CREDENTIAL_PROFILE` (`default` or `team_vault`)
+3. `FIGMA_USE_TEAM_VAULT` (`true`/`false`)
+4. prompt text (or `FIGMA_PROMPT_CONTEXT`) contains `team vault`
 
 Run with:
 ```bash

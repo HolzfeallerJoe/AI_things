@@ -29,6 +29,12 @@ export {
   generateId,
   sleep,
   retryWithBackoff,
+  resolveFigmaCredentials,
+} from './helpers.js';
+export type {
+  FigmaCredentialProfile,
+  ResolveFigmaCredentialsOptions,
+  ResolvedFigmaCredentials,
 } from './helpers.js';
 
 // Type exports

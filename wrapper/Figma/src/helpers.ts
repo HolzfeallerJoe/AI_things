@@ -1,5 +1,98 @@
 import { Color, SceneNode, FrameNode, TextNode, ComponentNode, InstanceNode } from './types.js';
 
+export type FigmaCredentialProfile = 'default' | 'team_vault';
+
+export interface ResolveFigmaCredentialsOptions {
+  promptText?: string;
+  forceProfile?: FigmaCredentialProfile;
+  env?: NodeJS.ProcessEnv;
+}
+
+export interface ResolvedFigmaCredentials {
+  profile: FigmaCredentialProfile;
+  accessToken: string;
+  teamId?: string;
+  userId?: string;
+}
+
+function parseBooleanFlag(value?: string): boolean | undefined {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (['1', 'true', 'yes', 'on'].includes(normalized)) return true;
+  if (['0', 'false', 'no', 'off'].includes(normalized)) return false;
+  return undefined;
+}
+
+function normalizeProfile(value?: string): FigmaCredentialProfile | undefined {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === 'team' || normalized === 'team_vault' || normalized === 'team-vault') {
+    return 'team_vault';
+  }
+  if (normalized === 'default' || normalized === 'personal') {
+    return 'default';
+  }
+  return undefined;
+}
+
+/**
+ * Resolve credentials from env and optionally switch profile when prompt text mentions "team vault".
+ *
+ * Priority:
+ * 1) forceProfile option
+ * 2) FIGMA_CREDENTIAL_PROFILE env ("default" | "team_vault")
+ * 3) FIGMA_USE_TEAM_VAULT env boolean
+ * 4) promptText / FIGMA_PROMPT_CONTEXT contains "team vault"
+ */
+export function resolveFigmaCredentials(
+  options: ResolveFigmaCredentialsOptions = {}
+): ResolvedFigmaCredentials {
+  const env = options.env ?? process.env;
+  const promptText = options.promptText ?? env.FIGMA_PROMPT_CONTEXT ?? '';
+
+  const forcedProfile = options.forceProfile;
+  const profileFromEnv = normalizeProfile(env.FIGMA_CREDENTIAL_PROFILE);
+  const useTeamFlag = parseBooleanFlag(env.FIGMA_USE_TEAM_VAULT);
+  const promptIndicatesTeamVault = /\bteam vault\b/i.test(promptText);
+
+  const profile: FigmaCredentialProfile =
+    forcedProfile ??
+    profileFromEnv ??
+    (useTeamFlag !== undefined ? (useTeamFlag ? 'team_vault' : 'default') : undefined) ??
+    (promptIndicatesTeamVault ? 'team_vault' : 'default');
+
+  const accessToken =
+    profile === 'team_vault'
+      ? env.FIGMA_TEAM_VAULT_ACCESS_TOKEN ?? env.FIGMA_ACCESS_TOKEN
+      : env.FIGMA_ACCESS_TOKEN;
+
+  if (!accessToken) {
+    if (profile === 'team_vault') {
+      throw new Error(
+        'Missing Figma access token. Set FIGMA_TEAM_VAULT_ACCESS_TOKEN (or fallback FIGMA_ACCESS_TOKEN).'
+      );
+    }
+    throw new Error('Missing Figma access token. Set FIGMA_ACCESS_TOKEN.');
+  }
+
+  const teamId =
+    profile === 'team_vault'
+      ? env.FIGMA_TEAM_VAULT_TEAM_ID ?? env.FIGMA_TEAM_ID
+      : env.FIGMA_TEAM_ID;
+
+  const userId =
+    profile === 'team_vault'
+      ? env.FIGMA_TEAM_VAULT_USER_ID ?? env.FIGMA_USER_ID
+      : env.FIGMA_USER_ID;
+
+  return {
+    profile,
+    accessToken,
+    teamId,
+    userId,
+  };
+}
+
 /**
  * Convert Figma color (0-1 range) to hex string
  */

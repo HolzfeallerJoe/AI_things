@@ -1,4 +1,26 @@
 import { Color, SceneNode, FrameNode, TextNode, ComponentNode, InstanceNode } from './types.js';
+export type FigmaCredentialProfile = 'default' | 'team_vault';
+export interface ResolveFigmaCredentialsOptions {
+    promptText?: string;
+    forceProfile?: FigmaCredentialProfile;
+    env?: NodeJS.ProcessEnv;
+}
+export interface ResolvedFigmaCredentials {
+    profile: FigmaCredentialProfile;
+    accessToken: string;
+    teamId?: string;
+    userId?: string;
+}
+/**
+ * Resolve credentials from env and optionally switch profile when prompt text mentions "team vault".
+ *
+ * Priority:
+ * 1) forceProfile option
+ * 2) FIGMA_CREDENTIAL_PROFILE env ("default" | "team_vault")
+ * 3) FIGMA_USE_TEAM_VAULT env boolean
+ * 4) promptText / FIGMA_PROMPT_CONTEXT contains "team vault"
+ */
+export declare function resolveFigmaCredentials(options?: ResolveFigmaCredentialsOptions): ResolvedFigmaCredentials;
 /**
  * Convert Figma color (0-1 range) to hex string
  */

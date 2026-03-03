@@ -11,6 +11,14 @@ The wrapper requires environment variables from `C:\Users\Dominik\Projects\Priva
 - `FIGMA_ACCESS_TOKEN` - Personal Access Token from https://www.figma.com/developers/api#access-tokens
 - `FIGMA_TEAM_ID` - Team ID (for listing projects, components, styles)
 - `FIGMA_USER_ID` - User ID
+- Optional team-vault profile:
+  - `FIGMA_TEAM_VAULT_ACCESS_TOKEN`
+  - `FIGMA_TEAM_VAULT_TEAM_ID`
+  - `FIGMA_TEAM_VAULT_USER_ID`
+- Optional profile switches:
+  - `FIGMA_CREDENTIAL_PROFILE` (`default` or `team_vault`)
+  - `FIGMA_USE_TEAM_VAULT` (`true`/`false`)
+  - `FIGMA_PROMPT_CONTEXT` (if it contains `team vault`, team-vault profile is selected)
 
 ## Code Pattern
 
@@ -18,13 +26,24 @@ The wrapper requires environment variables from `C:\Users\Dominik\Projects\Priva
 
 ```typescript
 import { config } from 'dotenv';
-import { FigmaClient, extractFileKey } from 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Figma/src/index.js';
+import {
+  FigmaClient,
+  extractFileKey,
+  resolveFigmaCredentials,
+} from 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Figma/src/index.js';
 
 config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Figma/.env' });
 
 async function main() {
+  const creds = resolveFigmaCredentials({
+    // Prefer forceProfile for deterministic scripts:
+    // forceProfile: 'team_vault',
+    // Or allow prompt-driven profile selection:
+    promptText: process.env.FIGMA_PROMPT_CONTEXT,
+  });
+
   const figma = new FigmaClient({
-    accessToken: process.env.FIGMA_ACCESS_TOKEN!,
+    accessToken: creds.accessToken,
   });
 
   // Your Figma operations here...
@@ -32,6 +51,12 @@ async function main() {
 
 main();
 ```
+
+Credential selection priority in `resolveFigmaCredentials()`:
+1. `forceProfile` option
+2. `FIGMA_CREDENTIAL_PROFILE`
+3. `FIGMA_USE_TEAM_VAULT`
+4. `promptText` / `FIGMA_PROMPT_CONTEXT` containing `team vault`
 
 ## Running Scripts
 
@@ -144,6 +169,8 @@ for (const comp of components.meta.components) {
 
 - **Always wrap in async function** - No top-level await support
 - **Always load `.env`** with the correct path using `config({ path: '...' })`
+- **Use `resolveFigmaCredentials()`** instead of reading `FIGMA_ACCESS_TOKEN` directly
+- **For team files, prefer `forceProfile: 'team_vault'`** so profile choice is explicit
 - **Use file keys, not URLs** - Extract with `extractFileKey(url)`
 - Node IDs use `:` format (e.g., `1:2`) but URLs use `-` format (e.g., `1-2`)
 - Rate limits apply - use `retryWithBackoff()` for automatic retries
@@ -163,3 +190,7 @@ Token is invalid or lacks permissions. Create a new one at https://www.figma.com
 
 ### 404 Not Found
 File key may be wrong or you don't have access to the file.
+
+### Variables endpoint scope error
+If `getLocalVariables()` fails with a scope error, the token is missing `file_variables:read`.
+You can still use `getFile()` and extract typography data from `TEXT` nodes without variables scope.
