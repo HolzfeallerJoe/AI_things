@@ -1,0 +1,9 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Port Blocker</string>
+    <string name="title_activity_main">Port Blocker</string>
+    <string name="package_name">com.portblocker.app</string>
+    <string name="custom_url_scheme">com.portblocker.app</string>
+    <string name="notification_channel_name">Port Blocker</string>
+    <string name="notification_channel_description">Shows active port blockers and quick actions.</string>
+</resources>

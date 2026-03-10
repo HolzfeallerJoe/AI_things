@@ -1,0 +1,148 @@
+<ion-header>
+  <ion-toolbar color="primary">
+    <ion-title>Port Blocker</ion-title>
+  </ion-toolbar>
+</ion-header>
+
+<ion-content fullscreen="true">
+  <div class="content-wrapper">
+    <!-- Add Blocker Form -->
+    <ion-card class="add-card">
+      <ion-card-header>
+        <ion-card-title>New Blocker</ion-card-title>
+        <ion-card-subtitle>Enter a port and protocol to start blocking</ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <form [formGroup]="blockerForm" (ngSubmit)="onStart()" novalidate>
+          <div class="form-row">
+            <ion-item class="port-input" [class.ion-invalid]="portInvalid">
+              <ion-label position="stacked">Port</ion-label>
+              <ion-input
+                type="number"
+                formControlName="port"
+                placeholder="1 - 65535"
+                inputmode="numeric"
+              ></ion-input>
+              <ion-note slot="error" *ngIf="portInvalid">{{ portError }}</ion-note>
+            </ion-item>
+
+            <ion-item class="protocol-select">
+              <ion-label position="stacked">Protocol</ion-label>
+              <ion-select formControlName="protocol" interface="popover">
+                <ion-select-option value="tcp">TCP</ion-select-option>
+                <ion-select-option value="udp">UDP</ion-select-option>
+              </ion-select>
+            </ion-item>
+          </div>
+
+          <ion-button
+            type="submit"
+            expand="block"
+            [disabled]="blockerForm.invalid || adding"
+            class="start-button"
+          >
+            <ion-spinner *ngIf="adding" name="crescent" slot="start"></ion-spinner>
+            <ion-icon *ngIf="!adding" name="play" slot="start"></ion-icon>
+            Start
+          </ion-button>
+        </form>
+      </ion-card-content>
+    </ion-card>
+
+    <!-- Active Blockers List -->
+    <ion-card class="blockers-card">
+      <ion-card-header>
+        <ion-card-title>Active Blockers</ion-card-title>
+        <ion-card-subtitle>
+          {{ blockers.length === 0 ? 'No blockers running' : blockers.length + ' blocker' + (blockers.length > 1 ? 's' : '') + ' active' }}
+        </ion-card-subtitle>
+      </ion-card-header>
+      <ion-card-content>
+        <div class="empty-state" *ngIf="blockers.length === 0">
+          <ion-icon name="ear-outline" class="empty-icon"></ion-icon>
+          <p>Start a blocker to see it here</p>
+        </div>
+
+        <ion-list lines="none" *ngIf="blockers.length > 0">
+          <ion-item-sliding *ngFor="let blocker of blockers; trackBy: trackById">
+            <ion-item class="blocker-item">
+              <ion-icon
+                [name]="statusIcon(blocker)"
+                [color]="statusColor(blocker)"
+                slot="start"
+                class="status-icon"
+              ></ion-icon>
+              <ion-label>
+                <h2 class="blocker-title">
+                  Port {{ blocker.port }}
+                  <ion-badge [color]="blocker.protocol === 'tcp' ? 'tertiary' : 'secondary'">
+                    {{ blocker.protocol | uppercase }}
+                  </ion-badge>
+                </h2>
+                <div class="blocker-stats">
+                  <span>
+                    <ion-icon name="swap-vertical-outline"></ion-icon>
+                    {{ blocker.connectionsCount }} conn
+                  </span>
+                  <span>
+                    <ion-icon name="download-outline"></ion-icon>
+                    {{ formatBytes(blocker.bytesReceived) }}
+                  </span>
+                </div>
+                <ion-badge [color]="statusColor(blocker)" class="status-badge">
+                  {{ blocker.status | titlecase }}
+                </ion-badge>
+                <ion-note *ngIf="blocker.errorMessage" color="danger" class="error-note">
+                  {{ blocker.errorMessage }}
+                </ion-note>
+              </ion-label>
+              <div class="action-buttons" slot="end">
+                <ion-button
+                  fill="clear"
+                  size="small"
+                  *ngIf="blocker.status === 'listening'"
+                  [disabled]="blocker.pendingAction"
+                  (click)="onPause(blocker)"
+                >
+                  <ion-icon slot="icon-only" name="pause" color="warning"></ion-icon>
+                </ion-button>
+                <ion-button
+                  fill="clear"
+                  size="small"
+                  *ngIf="blocker.status === 'paused'"
+                  [disabled]="blocker.pendingAction"
+                  (click)="onResume(blocker)"
+                >
+                  <ion-icon slot="icon-only" name="play" color="success"></ion-icon>
+                </ion-button>
+                <ion-button
+                  fill="clear"
+                  size="small"
+                  *ngIf="blocker.status === 'error'"
+                  [disabled]="blocker.pendingAction"
+                  (click)="onRetry(blocker)"
+                >
+                  <ion-icon slot="icon-only" name="refresh" color="primary"></ion-icon>
+                </ion-button>
+                <ion-button
+                  fill="clear"
+                  size="small"
+                  [disabled]="blocker.pendingAction"
+                  (click)="onStop(blocker)"
+                >
+                  <ion-icon slot="icon-only" name="stop" color="danger"></ion-icon>
+                </ion-button>
+              </div>
+            </ion-item>
+
+            <ion-item-options side="end">
+              <ion-item-option color="danger" (click)="onStop(blocker)">
+                <ion-icon slot="icon-only" name="trash-outline"></ion-icon>
+              </ion-item-option>
+            </ion-item-options>
+          </ion-item-sliding>
+        </ion-list>
+      </ion-card-content>
+    </ion-card>
+  </div>
+</ion-content>
