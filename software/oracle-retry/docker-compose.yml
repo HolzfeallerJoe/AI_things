@@ -1,0 +1,18 @@
+services:
+  oracle-retry:
+    image: python:3.12-slim
+    container_name: oracle-retry
+    restart: unless-stopped
+    volumes:
+      - ./retry.py:/app/retry.py:ro
+      - ./oci-config:/root/.oci:ro
+      - ./result:/app/result
+    environment:
+      # Override these in your shell or .env before starting the container.
+      - NTFY_TOPIC=${NTFY_TOPIC:-oracle-retry-changeme}
+      - RETRY_INTERVAL=${RETRY_INTERVAL:-300}
+      - INSTANCE_NAME=${INSTANCE_NAME:-pangolin-headscale}
+      - OCPUS=${OCPUS:-1}
+      - MEMORY_GB=${MEMORY_GB:-6}
+    command: >
+      bash -c "pip install --quiet oci requests && python -u /app/retry.py"
