@@ -55,9 +55,8 @@ When a break ends (either because you toggled it off or the budget ran out), Ant
 > YouTube is blocked again. Click to flush browser DNS cache.
 > [ Flush DNS cache ]
 
-- **Clicking the toast body** or the **"Flush DNS cache" action button** triggers the same flow as the tray menu item: detects your browser and opens the right flush page.
-- The toast routes clicks through a private `anti-youtube://flush` URL scheme (registered in `HKCU\Software\Classes\anti-youtube` on first launch). This is why click-through works even when your browser's own URL scheme (e.g. `brave://`, `opera://`) isn't system-registered.
-- On Linux, pystray falls back to a plain libnotify notification (no clickable action — use the tray menu).
+- **Windows:** clicking the toast body or the **Flush DNS cache** action button triggers the same flow as the tray menu item. Clicks are routed through a private `anti-youtube://flush` URL scheme (registered in `HKCU\Software\Classes\anti-youtube` on first launch), which avoids depending on the browser's own scheme (e.g. `brave://`, `opera://`) being registered system-wide.
+- **Linux:** the notification is posted via `notify-send --wait` with an action button. Clicking it — or (on KDE and some other daemons) the notification body — fires the flush. The notification auto-expires after 30 seconds, which also frees the waiting `notify-send` subprocess. GNOME shows the button; clicking the body just dismisses.
 
 ### Break budget
 
@@ -164,10 +163,11 @@ System prerequisites (Debian/Ubuntu example):
 ```bash
 sudo apt install python3 python3-venv python3-dev \
                  gir1.2-ayatanaappindicator3-0.1 \
-                 libcairo2-dev libgirepository1.0-dev
+                 libcairo2-dev libgirepository1.0-dev \
+                 libnotify-bin xdg-utils
 ```
 
-`gir1.2-ayatanaappindicator3-0.1` provides the tray backend pystray uses. On Fedora/Arch the package names differ (`libayatana-appindicator-gtk3` / `libayatana-appindicator`).
+`gir1.2-ayatanaappindicator3-0.1` provides the tray backend pystray uses. `libnotify-bin` provides `notify-send` (for the break-end toast with the "Flush DNS cache" button). `xdg-utils` provides `xdg-settings`, used for default-browser detection. On Fedora/Arch the package names differ (`libayatana-appindicator-gtk3` / `libayatana-appindicator`, `libnotify`, `xdg-utils`).
 
 Then build:
 

@@ -412,10 +412,7 @@ def _register_url_protocol() -> None:
         print(f"Protocol registration failed: {e}", file=sys.stderr)
 
 
-def _detect_default_browser() -> tuple[str, str] | None:
-    """Return (browser_exe, flush_url) for the default browser, or None."""
-    if not IS_WINDOWS:
-        return None
+def _detect_default_browser_windows() -> tuple[str, str] | None:
     try:
         import winreg
 
@@ -441,6 +438,53 @@ def _detect_default_browser() -> tuple[str, str] | None:
         return None
 
 
+def _detect_default_browser_linux() -> tuple[str, str] | None:
+    try:
+        res = subprocess.run(
+            ["xdg-settings", "get", "default-web-browser"],
+            capture_output=True,
+            text=True,
+            timeout=5,
+        )
+        desktop_file = res.stdout.strip()
+        if not desktop_file:
+            return None
+        name = desktop_file.lower()
+        flush_url = FLUSH_URL_DEFAULT
+        for key, url in FLUSH_URL_BY_BROWSER.items():
+            if key in name:
+                flush_url = url
+                break
+        search = [
+            Path("/usr/share/applications"),
+            Path("/usr/local/share/applications"),
+            Path("/var/lib/flatpak/exports/share/applications"),
+            Path("~/.local/share/applications").expanduser(),
+        ]
+        for base in search:
+            p = base / desktop_file
+            if not p.is_file():
+                continue
+            for line in p.read_text(encoding="utf-8", errors="ignore").splitlines():
+                if line.startswith("Exec="):
+                    exe = line.split("=", 1)[1].split()[0]
+                    if shutil.which(exe):
+                        return exe, flush_url
+                    break
+        return None
+    except Exception:
+        return None
+
+
+def _detect_default_browser() -> tuple[str, str] | None:
+    """Return (browser_exe, flush_url) for the default browser, or None."""
+    if IS_WINDOWS:
+        return _detect_default_browser_windows()
+    if IS_LINUX:
+        return _detect_default_browser_linux()
+    return None
+
+
 def open_flush_page(*_: object) -> None:
     info = _detect_default_browser()
     if info:
@@ -459,26 +503,61 @@ def open_flush_page(*_: object) -> None:
         pass
 
 
-def _notify_block_restored() -> None:
-    if IS_WINDOWS:
-        try:
-            from winotify import Notification
+NOTIFY_EXPIRE_SECONDS = 30
 
-            # Route clicks through our own URL scheme; _register_url_protocol()
-            # set up the handler. This avoids depending on the browser's own
-            # scheme (chrome://, brave://, ...) being registered system-wide.
-            launch_url = "anti-youtube://flush"
-            toast = Notification(
-                app_id="Anti-YouTube",
-                title="Anti-YouTube: break ended",
-                msg="YouTube is blocked again. Click to flush browser DNS cache.",
-                launch=launch_url,
+
+def _notify_block_restored_windows() -> bool:
+    try:
+        from winotify import Notification
+
+        launch_url = "anti-youtube://flush"
+        toast = Notification(
+            app_id="Anti-YouTube",
+            title="Anti-YouTube: break ended",
+            msg="YouTube is blocked again. Click to flush browser DNS cache.",
+            launch=launch_url,
+        )
+        toast.add_actions(label="Flush DNS cache", launch=launch_url)
+        toast.show()
+        return True
+    except Exception:
+        return False
+
+
+def _notify_block_restored_linux() -> bool:
+    if not shutil.which("notify-send"):
+        return False
+
+    def worker() -> None:
+        try:
+            res = subprocess.run(
+                [
+                    "notify-send",
+                    "--app-name=Anti-YouTube",
+                    "--wait",
+                    f"--expire-time={NOTIFY_EXPIRE_SECONDS * 1000}",
+                    "--action=default=Flush DNS cache",
+                    "Anti-YouTube: break ended",
+                    "YouTube is blocked again. Click to flush browser DNS cache.",
+                ],
+                capture_output=True,
+                text=True,
+                timeout=NOTIFY_EXPIRE_SECONDS + 5,
             )
-            toast.add_actions(label="Flush DNS cache", launch=launch_url)
-            toast.show()
-            return
+            if res.stdout.strip() == "default":
+                open_flush_page()
         except Exception:
             pass
+
+    threading.Thread(target=worker, daemon=True).start()
+    return True
+
+
+def _notify_block_restored() -> None:
+    if IS_WINDOWS and _notify_block_restored_windows():
+        return
+    if IS_LINUX and _notify_block_restored_linux():
+        return
     if icon is None:
         return
     try:
