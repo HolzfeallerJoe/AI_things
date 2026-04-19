@@ -1,0 +1,22 @@
+# Runtime state (per-user, DPAPI-encrypted — can't be decrypted on another machine anyway)
+state.bin
+state.json
+
+# Python virtual environment — recreate with: py -3.13 -m venv venv
+venv/
+
+# PyInstaller build artifacts — regenerate with the command in README.md
+build/
+dist/
+anti-youtube.exe
+
+# Python bytecode
+__pycache__/
+*.pyc
+*.pyo
+
+# IDE / editor
+.idea/
+.vscode/
+*.swp
+.DS_Store
