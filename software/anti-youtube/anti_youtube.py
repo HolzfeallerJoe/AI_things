@@ -1,16 +1,16 @@
 """Anti-YouTube: hosts-file based YouTube blocker with a daily break budget.
 
-Blocks youtube.com / www.youtube.com / m.youtube.com / youtu.be via the
-Windows hosts file. Leaves music.youtube.com untouched so YouTube Music
-keeps working. Daily 30-minute break budget that can be split however
-you like. Toggle break with Ctrl+Alt+Shift+Y or the tray icon.
+Supports Windows and Linux. Blocks youtube.com / www.youtube.com /
+m.youtube.com / youtu.be via the system hosts file. Leaves
+music.youtube.com untouched so YouTube Music keeps working. Daily
+30-minute break budget that can be split however you like. Toggle
+break with Ctrl+Alt+Shift+Y or the tray icon.
 """
 
-import ctypes
-import ctypes.wintypes as wintypes
 import datetime
 import json
 import os
+import shutil
 import subprocess
 import sys
 import threading
@@ -22,13 +22,13 @@ import keyboard
 import pystray
 
 
-if getattr(sys, "frozen", False):
-    APP_DIR = Path(sys.executable).parent
-else:
-    APP_DIR = Path(__file__).parent
-STATE_FILE = APP_DIR / "state.bin"
-LEGACY_STATE_FILE = APP_DIR / "state.json"
-HOSTS_PATH = Path(r"C:\Windows\System32\drivers\etc\hosts")
+IS_WINDOWS = sys.platform == "win32"
+IS_LINUX = sys.platform.startswith("linux")
+
+if not (IS_WINDOWS or IS_LINUX):
+    raise SystemExit("Anti-YouTube supports Windows and Linux only.")
+
+
 MARKER_START = "# anti-youtube start"
 MARKER_END = "# anti-youtube end"
 DAILY_BREAK_SECONDS = 30 * 60
@@ -42,61 +42,131 @@ BLOCKED_HOSTS = [
     "www.youtu.be",
 ]
 
+if IS_WINDOWS:
+    import ctypes
+    import ctypes.wintypes as wintypes
 
-class _DataBlob(ctypes.Structure):
-    _fields_ = [("cbData", wintypes.DWORD), ("pbData", ctypes.POINTER(ctypes.c_ubyte))]
-
-
-_crypt32 = ctypes.windll.crypt32
-_kernel32 = ctypes.windll.kernel32
-
-
-def _to_blob(data: bytes) -> _DataBlob:
-    buf = (ctypes.c_ubyte * len(data)).from_buffer_copy(data)
-    return _DataBlob(len(data), ctypes.cast(buf, ctypes.POINTER(ctypes.c_ubyte)))
+    HOSTS_PATH = Path(r"C:\Windows\System32\drivers\etc\hosts")
+else:
+    HOSTS_PATH = Path("/etc/hosts")
 
 
-def _blob_to_bytes(blob: _DataBlob) -> bytes:
-    try:
-        return ctypes.string_at(blob.pbData, blob.cbData)
-    finally:
-        _kernel32.LocalFree(blob.pbData)
+_STATE_DIR: Path | None = None
 
 
-def dpapi_encrypt(data: bytes) -> bytes:
-    in_blob = _to_blob(data)
-    out_blob = _DataBlob()
-    if not _crypt32.CryptProtectData(
-        ctypes.byref(in_blob), None, None, None, None, 0, ctypes.byref(out_blob)
-    ):
-        raise OSError("CryptProtectData failed")
-    return _blob_to_bytes(out_blob)
+def state_dir() -> Path:
+    global _STATE_DIR
+    if _STATE_DIR is not None:
+        return _STATE_DIR
+    if IS_WINDOWS:
+        if getattr(sys, "frozen", False):
+            _STATE_DIR = Path(sys.executable).parent
+        else:
+            _STATE_DIR = Path(__file__).parent
+    else:
+        _STATE_DIR = Path("/var/lib/anti-youtube")
+        _STATE_DIR.mkdir(parents=True, exist_ok=True)
+        os.chmod(_STATE_DIR, 0o700)
+    return _STATE_DIR
 
 
-def dpapi_decrypt(data: bytes) -> bytes:
-    in_blob = _to_blob(data)
-    out_blob = _DataBlob()
-    if not _crypt32.CryptUnprotectData(
-        ctypes.byref(in_blob), None, None, None, None, 0, ctypes.byref(out_blob)
-    ):
-        raise OSError("CryptUnprotectData failed")
-    return _blob_to_bytes(out_blob)
+def state_file() -> Path:
+    return state_dir() / "state.bin"
 
+
+def legacy_state_file() -> Path:
+    return state_dir() / "state.json"
+
+
+# ---------- Admin / elevation ----------
 
 def is_admin() -> bool:
-    try:
-        return ctypes.windll.shell32.IsUserAnAdmin() != 0
-    except Exception:
-        return False
+    if IS_WINDOWS:
+        try:
+            return ctypes.windll.shell32.IsUserAnAdmin() != 0
+        except Exception:
+            return False
+    return os.geteuid() == 0
 
 
 def elevate() -> None:
-    params = " ".join(f'"{a}"' for a in sys.argv)
-    ctypes.windll.shell32.ShellExecuteW(
-        None, "runas", sys.executable, params, None, 1
+    if IS_WINDOWS:
+        params = " ".join(f'"{a}"' for a in sys.argv)
+        ctypes.windll.shell32.ShellExecuteW(
+            None, "runas", sys.executable, params, None, 1
+        )
+        sys.exit(0)
+    for cmd in ("pkexec", "sudo"):
+        path = shutil.which(cmd)
+        if path:
+            os.execvp(path, [cmd, sys.executable, *sys.argv[1:]])
+    print(
+        "Anti-YouTube needs root. Install pkexec or run with sudo.",
+        file=sys.stderr,
     )
-    sys.exit(0)
+    sys.exit(1)
 
+
+# ---------- State encryption ----------
+
+if IS_WINDOWS:
+    class _DataBlob(ctypes.Structure):
+        _fields_ = [
+            ("cbData", wintypes.DWORD),
+            ("pbData", ctypes.POINTER(ctypes.c_ubyte)),
+        ]
+
+    _crypt32 = ctypes.windll.crypt32
+    _kernel32 = ctypes.windll.kernel32
+
+    def _to_blob(data: bytes) -> _DataBlob:
+        buf = (ctypes.c_ubyte * len(data)).from_buffer_copy(data)
+        return _DataBlob(len(data), ctypes.cast(buf, ctypes.POINTER(ctypes.c_ubyte)))
+
+    def _blob_to_bytes(blob: _DataBlob) -> bytes:
+        try:
+            return ctypes.string_at(blob.pbData, blob.cbData)
+        finally:
+            _kernel32.LocalFree(blob.pbData)
+
+    def encrypt_state(data: bytes) -> bytes:
+        in_blob = _to_blob(data)
+        out_blob = _DataBlob()
+        if not _crypt32.CryptProtectData(
+            ctypes.byref(in_blob), None, None, None, None, 0, ctypes.byref(out_blob)
+        ):
+            raise OSError("CryptProtectData failed")
+        return _blob_to_bytes(out_blob)
+
+    def decrypt_state(data: bytes) -> bytes:
+        in_blob = _to_blob(data)
+        out_blob = _DataBlob()
+        if not _crypt32.CryptUnprotectData(
+            ctypes.byref(in_blob), None, None, None, None, 0, ctypes.byref(out_blob)
+        ):
+            raise OSError("CryptUnprotectData failed")
+        return _blob_to_bytes(out_blob)
+
+else:
+    from cryptography.fernet import Fernet
+
+    def _get_key() -> bytes:
+        key_path = state_dir() / ".key"
+        if key_path.exists():
+            return key_path.read_bytes()
+        key = Fernet.generate_key()
+        key_path.write_bytes(key)
+        os.chmod(key_path, 0o600)
+        return key
+
+    def encrypt_state(data: bytes) -> bytes:
+        return Fernet(_get_key()).encrypt(data)
+
+    def decrypt_state(data: bytes) -> bytes:
+        return Fernet(_get_key()).decrypt(data)
+
+
+# ---------- State ----------
 
 def today_str() -> str:
     return datetime.date.today().isoformat()
@@ -113,18 +183,20 @@ def default_state() -> dict:
 
 def load_state() -> dict:
     raw = None
-    if STATE_FILE.exists():
+    sf = state_file()
+    legacy = legacy_state_file()
+    if sf.exists():
         try:
-            raw = dpapi_decrypt(STATE_FILE.read_bytes()).decode("utf-8")
+            raw = decrypt_state(sf.read_bytes()).decode("utf-8")
         except Exception:
             raw = None
-    elif LEGACY_STATE_FILE.exists():
+    elif legacy.exists():
         try:
-            raw = LEGACY_STATE_FILE.read_text(encoding="utf-8")
+            raw = legacy.read_text(encoding="utf-8")
         except Exception:
             raw = None
         try:
-            LEGACY_STATE_FILE.unlink()
+            legacy.unlink()
         except Exception:
             pass
     if raw:
@@ -140,8 +212,16 @@ def load_state() -> dict:
 
 def save_state(s: dict) -> None:
     payload = json.dumps(s).encode("utf-8")
-    STATE_FILE.write_bytes(dpapi_encrypt(payload))
+    sf = state_file()
+    sf.write_bytes(encrypt_state(payload))
+    if not IS_WINDOWS:
+        try:
+            os.chmod(sf, 0o600)
+        except Exception:
+            pass
 
+
+# ---------- Hosts file ----------
 
 def _strip_block(text: str) -> str:
     out, skipping = [], False
@@ -176,17 +256,30 @@ def remove_block() -> None:
     _flush_dns()
 
 
-def _flush_dns() -> None:
+def _run_quiet(cmd: list[str]) -> None:
     try:
-        subprocess.run(
-            ["ipconfig", "/flushdns"],
-            capture_output=True,
-            creationflags=subprocess.CREATE_NO_WINDOW,
-            timeout=5,
-        )
+        kwargs: dict = {"capture_output": True, "timeout": 5}
+        if IS_WINDOWS:
+            kwargs["creationflags"] = 0x08000000  # CREATE_NO_WINDOW
+        subprocess.run(cmd, **kwargs)
     except Exception:
         pass
 
+
+def _flush_dns() -> None:
+    if IS_WINDOWS:
+        _run_quiet(["ipconfig", "/flushdns"])
+        return
+    for cmd in (
+        ["resolvectl", "flush-caches"],
+        ["systemd-resolve", "--flush-caches"],
+        ["nscd", "-i", "hosts"],
+    ):
+        if shutil.which(cmd[0]):
+            _run_quiet(cmd)
+
+
+# ---------- Break state machine ----------
 
 state_lock = threading.Lock()
 state: dict = default_state()
@@ -245,6 +338,8 @@ def toggle_break() -> None:
         start_break()
 
 
+# ---------- Tray UI ----------
+
 def _make_icon_image(on_break: bool) -> Image.Image:
     img = Image.new("RGBA", (64, 64), (0, 0, 0, 0))
     d = ImageDraw.Draw(img)
@@ -298,6 +393,8 @@ def _build_menu() -> pystray.Menu:
         pystray.MenuItem(_menu_hotkey_label, None, enabled=False),
     )
 
+
+# ---------- Ticker / startup ----------
 
 def ticker() -> None:
     while True:

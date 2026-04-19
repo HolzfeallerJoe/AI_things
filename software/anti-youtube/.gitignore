@@ -9,6 +9,8 @@ venv/
 build/
 dist/
 anti-youtube.exe
+anti-youtube
+!anti_youtube.py
 
 # Python bytecode
 __pycache__/
