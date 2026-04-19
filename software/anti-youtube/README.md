@@ -30,9 +30,34 @@ A red dot appears in the system tray — you're blocked.
 ### Toggle a break
 
 - **Global hotkey:** `Ctrl + Alt + Shift + Y` (works from anywhere, no need to focus the app).
-- **Tray icon:** left-click, or right-click → `Start break` / `End break`.
+- **Tray icon:** left-click (fires the default action = toggle break), or right-click for the full menu.
 
-The icon turns green while on break. The tray tooltip and right-click menu show how much break time you have left for the day.
+The icon turns green while on break, red while blocked. The tooltip shows current status + remaining daily budget.
+
+### Tray menu
+
+Right-click the tray icon to see:
+
+| Item | What it does |
+|---|---|
+| **Start break** / **End break** | Toggle the break. Default item — a left-click triggers this too. |
+| **Flush browser DNS cache** | Detects your default browser (Chrome, Edge, Firefox, Brave, Opera, Vivaldi) and opens its DNS-flush page directly. Use this right after ending a break if a YouTube tab is still loading. |
+| *Status line* (disabled) | "BLOCKED — MM:SS break left" or "BREAK — MM:SS left today". |
+| *Hotkey line* (disabled) | Reminder of the configured shortcut. |
+
+No "Quit" / "Exit" item — by design. See [Stopping the app](#stopping-the-app).
+
+### Break-end notification
+
+When a break ends (either because you toggled it off or the budget ran out), Anti-YouTube posts a Windows toast:
+
+> **Anti-YouTube: break ended**
+> YouTube is blocked again. Click to flush browser DNS cache.
+> [ Flush DNS cache ]
+
+- **Clicking the toast body** or the **"Flush DNS cache" action button** triggers the same flow as the tray menu item: detects your browser and opens the right flush page.
+- The toast routes clicks through a private `anti-youtube://flush` URL scheme (registered in `HKCU\Software\Classes\anti-youtube` on first launch). This is why click-through works even when your browser's own URL scheme (e.g. `brave://`, `opera://`) isn't system-registered.
+- On Linux, pystray falls back to a plain libnotify notification (no clickable action — use the tray menu).
 
 ### Break budget
 
@@ -59,11 +84,7 @@ Killing the app leaves the current block state in place — if you kill it while
 
 ## Known limitations
 
-1. **Browser DNS cache lag.** When a break ends, browsers keep their own DNS cache (~60 seconds) and reuse already-open HTTP/2 connections. YouTube may keep loading for up to a minute after the block is restored. Workarounds:
-   - Close the YouTube tab before the break ends.
-   - Chrome/Edge: visit `chrome://net-internals/#dns` → *Clear host cache*, then `chrome://net-internals/#sockets` → *Flush socket pools*.
-   - Firefox: `about:networking#dns` → *Clear DNS Cache*.
-   - Or restart the browser.
+1. **Browser DNS cache lag.** When a break ends, browsers keep their own DNS cache (~60 seconds) and reuse already-open HTTP/2 connections. YouTube may keep loading for up to a minute after the block is restored. The app can't clear the browser's internal cache from outside — so it gives you a one-click shortcut instead (break-end toast → *Flush DNS cache*, or the tray menu item). That opens your browser's internal DNS-flush page. On that page, click *Clear host cache* and — on Chromium browsers — *Flush socket pools* under the `#sockets` tab. Or just close the YouTube tab before the break ends.
 
 2. **DNS-over-HTTPS (DoH) bypass.** If your browser has DoH enabled (some have it on by default), it resolves hostnames over HTTPS and ignores the `hosts` file entirely. The app intentionally does **not** change any system settings to compensate. If YouTube still loads when it shouldn't, check your browser's DoH / "Secure DNS" setting and turn it off. (Chrome: *Settings → Privacy and security → Security → Use secure DNS*.)
 
@@ -83,20 +104,35 @@ anti-youtube/
   version_info.txt      PE version metadata (Windows only)
   anti-youtube.exe      Built launcher — Windows (not committed)
   anti-youtube          Built launcher — Linux (not committed)
+  uninstall.bat         One-click uninstaller — Windows
   venv/                 Virtual environment used for builds (not committed)
   README.md             This file
 ```
 
-At runtime, state lives separately from the install directory:
+## What the app touches on your system
 
-- **Windows:** `state.bin` next to `anti-youtube.exe`, encrypted with **DPAPI** (tied to your Windows user).
-- **Linux:** `/var/lib/anti-youtube/state.bin`, encrypted with **Fernet** using a key at `/var/lib/anti-youtube/.key` (both root-only, mode `0600`).
+| Path / key | Purpose | Reverted by `--uninstall` |
+|---|---|---|
+| `C:\Windows\System32\drivers\etc\hosts` (Win) / `/etc/hosts` (Linux) | Block lines between `# anti-youtube start` / `# anti-youtube end` markers | Yes |
+| `state.bin` next to the exe (Win) | Encrypted break-budget state (DPAPI, per-user) | Yes |
+| `/var/lib/anti-youtube/` (Linux) | State + Fernet key, mode `0700` / `0600` | Yes (directory removed) |
+| `HKCU\Software\Classes\anti-youtube` (Win) | Registers the `anti-youtube://` URL scheme so toast clicks route through the app | Yes |
 
-The state stores the current date, how many break-seconds have been used today, and whether a break is running. Encryption is tamper-*resistance*, not tamper-*proofness* — a determined you could still decrypt and edit it, but that's well past the "open in a text editor" threshold.
+Nothing else is changed. DNS / DoH settings, firewall rules, startup entries, browser profiles — all untouched.
+
+The state file records the current date, break-seconds used today, and whether a break is currently running. Encryption is tamper-*resistance*, not tamper-*proofness* — a determined you could still decrypt and edit it, but that's well past the "open in a text editor" threshold.
 
 ## Building
 
-Requirements: Python 3.11+ (3.13 recommended).
+Requirements: Python 3.11+ (3.13 recommended). All Python deps are in `requirements.txt`:
+
+| Package | Purpose | Platform |
+|---|---|---|
+| `pystray` + `pillow` | Tray icon and menu | all |
+| `keyboard` | Global hotkey | all |
+| `winotify` | Rich Windows 10/11 toast with action button | Windows |
+| `cryptography` | Fernet state encryption | Linux |
+| `pyinstaller` | Build the single-file exe/binary | all |
 
 ### Windows
 
@@ -117,6 +153,7 @@ venv\Scripts\python.exe -m PyInstaller --noconfirm --onefile --windowed ^
   --version-file version_info.txt ^
   --hidden-import keyboard ^
   --hidden-import pystray._win32 ^
+  --hidden-import winotify ^
   anti_youtube.py
 ```
 
@@ -155,20 +192,35 @@ All tunables are constants at the top of `anti_youtube.py`:
 - `DAILY_BREAK_SECONDS` — default `30 * 60`. Change the daily budget.
 - `HOTKEY` — default `"ctrl+alt+shift+y"`. Uses the [`keyboard` library's syntax](https://github.com/boppreh/keyboard#keyboard.add_hotkey).
 - `BLOCKED_HOSTS` — hostnames written to the `hosts` file. `music.youtube.com` is deliberately absent.
+- `FLUSH_URL_BY_BROWSER` / `FLUSH_URL_DEFAULT` — per-browser URL opened by the "Flush browser DNS cache" menu item.
 
 After editing, rebuild (see above).
 
+## CLI flags
+
+| Invocation | What it does |
+|---|---|
+| `anti-youtube.exe` | Normal startup: elevate, apply block, register URL scheme (Win), run tray. |
+| `anti-youtube.exe --uninstall` | Self-elevates, reverts every system change, exits. Does not delete the install folder. |
+| `anti-youtube.exe anti-youtube://flush` | Internal. Fired by toast clicks. Opens the detected browser's DNS-flush page and exits. No elevation needed. |
+
+On Linux the same flags apply (`./anti-youtube --uninstall`); `anti-youtube://...` is Windows-specific.
+
 ## Uninstall
 
-**Windows:**
-1. Kill `anti-youtube.exe` from Task Manager (as admin).
-2. Open `C:\Windows\System32\drivers\etc\hosts` in an admin editor and remove lines between `# anti-youtube start` and `# anti-youtube end`.
-3. Delete the `anti-youtube` folder.
+**Windows:** double-click **`uninstall.bat`**. It will:
+- kill any running `anti-youtube.exe`
+- remove the YouTube block from `hosts` (single UAC prompt)
+- delete `state.bin`
+- delete the `HKCU\Software\Classes\anti-youtube` registry entry
+- delete the entire folder
+
+Alternative (manual): run `anti-youtube.exe --uninstall` yourself (does everything except the folder delete), then delete the folder.
 
 **Linux:**
 ```bash
-sudo pkill -f anti-youtube
-sudo sed -i '/# anti-youtube start/,/# anti-youtube end/d' /etc/hosts
-sudo rm -rf /var/lib/anti-youtube
+sudo ./anti-youtube --uninstall
+# then
 rm -rf /path/to/anti-youtube
 ```
+`--uninstall` removes the hosts entry, `/var/lib/anti-youtube/` (state + key), and flushes DNS. It does not delete the install folder.

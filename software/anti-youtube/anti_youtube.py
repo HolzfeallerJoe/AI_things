@@ -15,6 +15,7 @@ import subprocess
 import sys
 import threading
 import time
+import webbrowser
 from pathlib import Path
 
 from PIL import Image, ImageDraw
@@ -41,6 +42,17 @@ BLOCKED_HOSTS = [
     "youtu.be",
     "www.youtu.be",
 ]
+
+FLUSH_URL_BY_BROWSER = {
+    "chrome": "chrome://net-internals/#dns",
+    "msedge": "edge://net-internals/#dns",
+    "edge": "edge://net-internals/#dns",
+    "firefox": "about:networking#dns",
+    "brave": "brave://net-internals/#dns",
+    "opera": "opera://net-internals/#dns",
+    "vivaldi": "vivaldi://net-internals/#dns",
+}
+FLUSH_URL_DEFAULT = "chrome://net-internals/#dns"
 
 if IS_WINDOWS:
     import ctypes
@@ -327,6 +339,155 @@ def end_break() -> None:
         save_state(state)
     apply_block()
     _refresh_icon()
+    _notify_block_restored()
+
+
+def _delete_reg_key_tree(hive: int, path: str) -> None:
+    import winreg
+
+    try:
+        with winreg.OpenKey(hive, path, 0, winreg.KEY_ALL_ACCESS) as key:
+            while True:
+                try:
+                    sub = winreg.EnumKey(key, 0)
+                except OSError:
+                    break
+                _delete_reg_key_tree(hive, f"{path}\\{sub}")
+        winreg.DeleteKey(hive, path)
+    except OSError:
+        pass
+
+
+def uninstall() -> None:
+    """Remove the hosts entry, state file, and registered URL protocol."""
+    try:
+        original = HOSTS_PATH.read_text(encoding="utf-8")
+        stripped = _strip_block(original)
+        if stripped != original:
+            HOSTS_PATH.write_text(stripped, encoding="utf-8")
+        _flush_dns()
+    except Exception:
+        pass
+
+    for f in (state_file(), legacy_state_file()):
+        try:
+            f.unlink(missing_ok=True)
+        except Exception:
+            pass
+
+    if IS_LINUX:
+        try:
+            (state_dir() / ".key").unlink(missing_ok=True)
+            state_dir().rmdir()
+        except Exception:
+            pass
+
+    if IS_WINDOWS:
+        import winreg
+
+        _delete_reg_key_tree(
+            winreg.HKEY_CURRENT_USER, r"Software\Classes\anti-youtube"
+        )
+
+
+def _register_url_protocol() -> None:
+    """Register anti-youtube:// URL scheme so toast notifications can call back."""
+    if not IS_WINDOWS:
+        return
+    try:
+        import winreg
+
+        exe = sys.executable
+        with winreg.CreateKey(
+            winreg.HKEY_CURRENT_USER, r"Software\Classes\anti-youtube"
+        ) as k:
+            winreg.SetValue(k, "", winreg.REG_SZ, "URL:Anti-YouTube Protocol")
+            winreg.SetValueEx(k, "URL Protocol", 0, winreg.REG_SZ, "")
+        with winreg.CreateKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Classes\anti-youtube\shell\open\command",
+        ) as k:
+            winreg.SetValue(k, "", winreg.REG_SZ, f'"{exe}" "%1"')
+    except Exception as e:
+        print(f"Protocol registration failed: {e}", file=sys.stderr)
+
+
+def _detect_default_browser() -> tuple[str, str] | None:
+    """Return (browser_exe, flush_url) for the default browser, or None."""
+    if not IS_WINDOWS:
+        return None
+    try:
+        import winreg
+
+        with winreg.OpenKey(
+            winreg.HKEY_CURRENT_USER,
+            r"Software\Microsoft\Windows\Shell\Associations\UrlAssociations\http\UserChoice",
+        ) as k:
+            prog_id = winreg.QueryValueEx(k, "ProgId")[0]
+        with winreg.OpenKey(
+            winreg.HKEY_CLASSES_ROOT, rf"{prog_id}\shell\open\command"
+        ) as k:
+            cmd = winreg.QueryValueEx(k, "")[0]
+        if cmd.startswith('"'):
+            exe = cmd[1 : cmd.index('"', 1)]
+        else:
+            exe = cmd.split()[0]
+        pid = prog_id.lower()
+        for key, url in FLUSH_URL_BY_BROWSER.items():
+            if key in pid:
+                return exe, url
+        return exe, FLUSH_URL_DEFAULT
+    except Exception:
+        return None
+
+
+def open_flush_page(*_: object) -> None:
+    info = _detect_default_browser()
+    if info:
+        exe, url = info
+        try:
+            kwargs: dict = {}
+            if IS_WINDOWS:
+                kwargs["creationflags"] = 0x08000000
+            subprocess.Popen([exe, url], **kwargs)
+            return
+        except Exception:
+            pass
+    try:
+        webbrowser.open(FLUSH_URL_DEFAULT)
+    except Exception:
+        pass
+
+
+def _notify_block_restored() -> None:
+    if IS_WINDOWS:
+        try:
+            from winotify import Notification
+
+            # Route clicks through our own URL scheme; _register_url_protocol()
+            # set up the handler. This avoids depending on the browser's own
+            # scheme (chrome://, brave://, ...) being registered system-wide.
+            launch_url = "anti-youtube://flush"
+            toast = Notification(
+                app_id="Anti-YouTube",
+                title="Anti-YouTube: break ended",
+                msg="YouTube is blocked again. Click to flush browser DNS cache.",
+                launch=launch_url,
+            )
+            toast.add_actions(label="Flush DNS cache", launch=launch_url)
+            toast.show()
+            return
+        except Exception:
+            pass
+    if icon is None:
+        return
+    try:
+        icon.notify(
+            "YouTube is blocked again. Use the tray menu → Flush browser DNS cache.",
+            "Anti-YouTube: break ended",
+        )
+    except Exception:
+        pass
 
 
 def toggle_break() -> None:
@@ -389,6 +550,7 @@ def _menu_hotkey_label(_item) -> str:
 def _build_menu() -> pystray.Menu:
     return pystray.Menu(
         pystray.MenuItem(_menu_toggle_label, lambda *_: toggle_break(), default=True),
+        pystray.MenuItem("Flush browser DNS cache", open_flush_page),
         pystray.MenuItem(_menu_status_label, None, enabled=False),
         pystray.MenuItem(_menu_hotkey_label, None, enabled=False),
     )
@@ -432,10 +594,26 @@ def startup_reconcile() -> None:
 def main() -> None:
     global state, icon
 
+    # Protocol handler: fire-and-forget mode triggered by clicking a toast.
+    # Runs as a regular (non-elevated) process — just opens the flush page.
+    if len(sys.argv) > 1 and sys.argv[1].startswith("anti-youtube:"):
+        action = sys.argv[1].split("://", 1)[-1].strip("/").lower()
+        if action == "flush":
+            open_flush_page()
+        return
+
+    if "--uninstall" in sys.argv:
+        if not is_admin():
+            elevate()
+            return
+        uninstall()
+        return
+
     if not is_admin():
         elevate()
         return
 
+    _register_url_protocol()
     state = load_state()
     startup_reconcile()
     apply_block()
