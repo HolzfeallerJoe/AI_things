@@ -673,12 +673,16 @@ def startup_reconcile() -> None:
 def main() -> None:
     global state, icon
 
-    # Protocol handler: fire-and-forget mode triggered by clicking a toast.
-    # Runs as a regular (non-elevated) process — just opens the flush page.
+    # Fire-and-forget modes: open the browser flush page and exit.
+    # No elevation required. Used by toast clicks and direct invocation.
     if len(sys.argv) > 1 and sys.argv[1].startswith("anti-youtube:"):
         action = sys.argv[1].split("://", 1)[-1].strip("/").lower()
         if action == "flush":
             open_flush_page()
+        return
+
+    if "--flush" in sys.argv:
+        open_flush_page()
         return
 
     if "--uninstall" in sys.argv:

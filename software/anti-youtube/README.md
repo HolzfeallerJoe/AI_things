@@ -201,10 +201,11 @@ After editing, rebuild (see above).
 | Invocation | What it does |
 |---|---|
 | `anti-youtube.exe` | Normal startup: elevate, apply block, register URL scheme (Win), run tray. |
+| `anti-youtube.exe --flush` | Opens the detected browser's DNS-flush page and exits. No elevation needed; no tray icon; no effect on the running instance. Handy as a keyboard-shortcut or desktop-shortcut target. |
 | `anti-youtube.exe --uninstall` | Self-elevates, reverts every system change, exits. Does not delete the install folder. |
-| `anti-youtube.exe anti-youtube://flush` | Internal. Fired by toast clicks. Opens the detected browser's DNS-flush page and exits. No elevation needed. |
+| `anti-youtube.exe anti-youtube://flush` | Internal. Same as `--flush`, but invoked through the registered URL scheme when you click a toast. |
 
-On Linux the same flags apply (`./anti-youtube --uninstall`); `anti-youtube://...` is Windows-specific.
+On Linux the same flags apply (`./anti-youtube --flush`, `./anti-youtube --uninstall`); `anti-youtube://...` is Windows-specific.
 
 ## Uninstall
 
