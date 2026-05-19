@@ -9,7 +9,7 @@ This skill guides creation of distinctive, production-grade frontend interfaces 
 The user provides frontend requirements: a component, page, application, or interface to build. They may include context about the purpose, audience, or technical constraints.
 
 ## Starting from Scratch
-If you are starting the frontend with no other references you need to create FIVE different designs, so the user can judge on them and device for a starting point or iteration of the design. Each design should be creative and unique from all the others that you create. The should be hosted on /1, /2, /3, /4 and /5 respectively
+If you are starting the frontend with no other references you need to create FIVE different designs, so the user can judge on them and device for a starting point or iteration of the design. Each design should be creative and unique from all the others that you create. The should be hosted on /1, /2, /3, /4 and /5 respectively. If the user did not give you any technologies ask the user before continuing with the process.
 
 ## Design Thinking
 
@@ -21,7 +21,7 @@ Before coding, understand the context and commit to a BOLD aesthetic direction:
 
 **CRITICAL**: Choose a clear conceptual direction and execute it with precision. Bold maximalism and refined minimalism both work - the key is intentionality, not intensity.
 
-Then implement working code (HTML/CSS/JS, React, Vue, etc.) that is:
+Then implement working code that is:
 - Production-grade and functional
 - Visually striking and memorable
 - Cohesive with a clear aesthetic point-of-view
@@ -42,4 +42,4 @@ Interpret creatively and make unexpected choices that feel genuinely designed fo
 
 **IMPORTANT**: Match implementation complexity to the aesthetic vision. Maximalist designs need elaborate code with extensive animations and effects. Minimalist or refined designs need restraint, precision, and careful attention to spacing, typography, and subtle details. Elegance comes from executing the vision well.
 
-Remember: Claude is capable of extraordinary creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a distinctive vision.
+Remember: You are capable of extraordinary creative work. Don't hold back, show what can truly be created when thinking outside the box and committing fully to a distinctive vision.
