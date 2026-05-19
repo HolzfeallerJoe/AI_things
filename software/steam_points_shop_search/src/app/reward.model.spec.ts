@@ -4,6 +4,7 @@ import {
   buildAssetUrl,
   buildShopUrl,
   rewardClassLabel,
+  rewardHasAnimation,
   rewardImageFile,
   rewardPreviewImageFile,
   rewardSmallVideoFile,
@@ -82,6 +83,7 @@ describe('reward model helpers', () => {
     expect(rewardImageFile(item)).toBe('chat-large.avif');
     expect(rewardVideoFile(item)).toBe('chat-large.webm');
     expect(rewardSmallVideoFile(item)).toBe('chat-small.webm');
+    expect(rewardHasAnimation(item)).toBe(true);
   });
 
   it('keeps animated image thumbnails static but previews animated', () => {
@@ -100,5 +102,6 @@ describe('reward model helpers', () => {
 
     expect(rewardThumbnailFile(item)).toBe('frame-static.png');
     expect(rewardPreviewImageFile(item)).toBe('frame-animated.png');
+    expect(rewardHasAnimation(item)).toBe(true);
   });
 });

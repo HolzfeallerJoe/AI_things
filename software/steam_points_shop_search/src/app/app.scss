@@ -526,6 +526,7 @@ $cols: 60px 56px minmax(0, 1fr) 200px 100px 90px;
   }
 
   .t {
+    position: relative;
     width: 44px; height: 44px;
     background: var(--surface);
     border: 1px solid var(--border);

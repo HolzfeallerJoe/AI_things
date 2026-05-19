@@ -27,6 +27,7 @@ import {
   buildAssetUrl,
   buildShopUrl,
   rewardClassLabel,
+  rewardHasAnimation,
   rewardImageFile,
   rewardSmallVideoFile,
   rewardThumbnailFile,
@@ -499,6 +500,10 @@ export class App implements OnInit {
 
   thumbUrl(it: RewardDefinition): string | null {
     return buildAssetUrl(it.appid, rewardThumbnailFile(it));
+  }
+
+  isAnimated(it: RewardDefinition): boolean {
+    return rewardHasAnimation(it);
   }
 
   assetHref(it: RewardDefinition): string | null {

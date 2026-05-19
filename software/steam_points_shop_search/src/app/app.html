@@ -228,6 +228,9 @@
             <span class="t">
               @if (thumbUrl(it); as u) {
                 <app-static-thumbnail [src]="u" alt="" />
+                @if (isAnimated(it)) {
+                  <span style="position:absolute;top:0;left:3px;color:var(--accent);font-size:12px" title="Animated item" aria-label="Animated item">▶</span>
+                }
               } @else {
                 <span class="t__none"></span>
               }

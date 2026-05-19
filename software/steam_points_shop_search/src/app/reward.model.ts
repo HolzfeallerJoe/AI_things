@@ -105,6 +105,10 @@ export function rewardSmallVideoFile(it: RewardDefinition): string | undefined {
     ?? rewardVideoFile(it);
 }
 
+export function rewardHasAnimation(it: RewardDefinition): boolean {
+  return it.community_item_data?.animated === true || rewardVideoFile(it) != null;
+}
+
 function isAnimatedImageReward(it: RewardDefinition): boolean {
   return it.community_item_data?.animated === true && !rewardVideoFile(it);
 }
