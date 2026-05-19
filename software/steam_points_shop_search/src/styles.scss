@@ -1,0 +1,90 @@
+:root {
+  --bg: #0a0a09;
+  --surface: #131312;
+  --surface-2: #1b1b19;
+  --surface-3: #232220;
+  --border: #2a2925;
+  --border-hi: #403d36;
+  --text: #ece8e0;
+  --muted: #8d8579;
+  --dim: #5a544a;
+  --accent: #b6ff5a;
+  --accent-soft: rgba(182, 255, 90, 0.12);
+  --accent-2: #ff7d2b;
+  --accent-2-soft: rgba(255, 125, 43, 0.10);
+  --warn: #ff4760;
+  --serif: 'Fraunces', 'Iowan Old Style', 'Georgia', serif;
+  --mono: 'JetBrains Mono', ui-monospace, 'SF Mono', Menlo, monospace;
+}
+
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  background: var(--bg);
+  color: var(--text);
+  font-family: var(--mono);
+  font-size: 13px;
+  line-height: 1.5;
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+body {
+  background:
+    radial-gradient(1200px 800px at 85% -10%, rgba(182, 255, 90, 0.045), transparent 60%),
+    radial-gradient(900px 600px at -10% 110%, rgba(255, 125, 43, 0.05), transparent 60%),
+    var(--bg);
+  min-height: 100vh;
+  overflow-x: hidden;
+}
+
+::selection { background: var(--accent); color: var(--bg); }
+
+::-webkit-scrollbar { width: 10px; height: 10px; }
+::-webkit-scrollbar-thumb {
+  background: var(--border-hi);
+  border: 2px solid var(--bg);
+}
+::-webkit-scrollbar-thumb:hover { background: var(--accent); }
+::-webkit-scrollbar-track { background: var(--bg); }
+
+.grain {
+  position: fixed; inset: 0; pointer-events: none; z-index: 99;
+  background-image: url("data:image/svg+xml;utf8,<svg viewBox='0 0 200 200' xmlns='http://www.w3.org/2000/svg'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0 0.5 0 0 0 0.35 0'/></filter><rect width='100%' height='100%' filter='url(%23n)'/></svg>");
+  opacity: 0.55;
+  mix-blend-mode: overlay;
+}
+
+.scanlines {
+  position: fixed; inset: 0; pointer-events: none; z-index: 100;
+  background: repeating-linear-gradient(
+    to bottom,
+    transparent 0,
+    transparent 2px,
+    rgba(0, 0, 0, 0.22) 2px,
+    rgba(0, 0, 0, 0.22) 3px
+  );
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    scroll-behavior: auto !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  .grain,
+  .scanlines {
+    opacity: 0.2;
+  }
+}
+
+input, button, select, textarea {
+  font: inherit;
+  color: inherit;
+}
+
+a { color: inherit; }

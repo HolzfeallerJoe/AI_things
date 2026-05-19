@@ -1,0 +1,23 @@
+{
+  "/steam-api": {
+    "target": "https://api.steampowered.com",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": { "^/steam-api": "" },
+    "logLevel": "info"
+  },
+  "/steam-community": {
+    "target": "https://steamcommunity.com",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": { "^/steam-community": "" },
+    "logLevel": "info"
+  },
+  "/steam-store": {
+    "target": "https://store.steampowered.com",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": { "^/steam-store": "" },
+    "logLevel": "info"
+  }
+}

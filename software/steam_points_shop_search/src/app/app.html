@@ -1,0 +1,292 @@
+<div class="grain"></div>
+<div class="scanlines"></div>
+
+<main class="shell" (mousemove)="onMouseMove($event)">
+  <header class="masthead">
+    <div class="masthead__left">
+      <div class="masthead__brand">
+        <span class="dot"></span>
+        <span class="mark">POINTS&nbsp;//&nbsp;SHOP&nbsp;RECONNAISSANCE</span>
+        <span class="sep">·</span>
+        <span class="rev">REV.07&nbsp;<i>2026</i></span>
+        <button
+          type="button"
+          class="sound-toggle"
+          [class.sound-toggle--muted]="soundMuted()"
+          [attr.aria-pressed]="soundMuted()"
+          (click)="toggleSoundMuted()">
+          {{ soundMuted() ? 'SOUND OFF' : 'SOUND ON' }}
+        </button>
+      </div>
+      <h1 class="masthead__title">
+        <span class="line-1">Loyalty</span>
+        <span class="line-2">rewards,<br><em>field manual.</em></span>
+      </h1>
+    </div>
+
+    <aside class="masthead__sub">
+      <p class="lede">
+        An itemised scan of Steam's points shop.
+      </p>
+      <p>
+        Pick a game by name or appid, or load Steam's global rewards index to search across
+        points-shop items without a curated game list.
+      </p>
+      <p class="mono-note">
+        SRC&nbsp;·&nbsp;ILoyaltyRewardsService/QueryRewardItems/v1
+      </p>
+    </aside>
+  </header>
+
+  <section class="console">
+    <!-- Row 1: GAME picker -->
+    <form class="picker" (submit)="submitGamePicker(); $event.preventDefault()">
+      <label for="game">GAME</label>
+      <span class="prompt">&gt;</span>
+      <div class="picker__input-wrap">
+        <input
+          id="game"
+          type="text"
+          autocomplete="off"
+          spellcheck="false"
+          placeholder="search by name or paste an appid…"
+          role="combobox"
+          aria-autocomplete="list"
+          aria-controls="game-options"
+          [attr.aria-expanded]="gamePickerOpen()"
+          [attr.aria-activedescendant]="activeSuggestionId()"
+          [ngModel]="gamePickerInput()"
+          name="game"
+          (ngModelChange)="onGamePickerInput($event)"
+          (focus)="onGamePickerFocus()"
+          (blur)="onGamePickerBlur()"
+          (keydown)="onGamePickerKeydown($event)">
+
+        @if (gamePickerMeta(); as meta) {
+          <span class="picker__meta" aria-hidden="true">&gt; {{ meta }}</span>
+        }
+
+        @if (gameSearching()) {
+          <span class="picker__spinner"></span>
+        }
+
+        @if (gamePickerOpen() && gameSuggestions().length > 0) {
+          <ul id="game-options" class="picker__dropdown" role="listbox">
+            @for (hit of gameSuggestions(); track hit.appid; let idx = $index) {
+              <li>
+                <button
+                  type="button"
+                  class="picker__hit"
+                  role="option"
+                  [id]="suggestionId(hit)"
+                  [class.active]="activeSuggestionIndex() === idx"
+                  [attr.aria-selected]="activeSuggestionIndex() === idx"
+                  (mouseenter)="activeSuggestionIndex.set(idx)"
+                  (mousedown)="$event.preventDefault(); pickGame(hit)">
+                  @if (hit.icon) {
+                    <img class="picker__icon" [src]="hit.icon" alt="" loading="lazy">
+                  } @else {
+                    <span class="picker__icon picker__icon--empty"></span>
+                  }
+                  <span class="picker__name">{{ hit.name }}</span>
+                  <span class="picker__id">{{ hit.appid }}</span>
+                </button>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+      <button type="submit" class="btn btn--fetch">FETCH</button>
+    </form>
+
+    <!-- Row 2: ITEM search & global scan -->
+    <div class="finder">
+      <label for="q">ITEM</label>
+      <span class="prompt">/</span>
+      <input
+        id="q"
+        type="search"
+        autocomplete="off"
+        placeholder='filter by item name — e.g. "cat", "wolf", "frame"…'
+        name="q"
+        [ngModel]="query()"
+        (ngModelChange)="query.set($event)">
+      <button type="button" class="btn btn--scan" [class.active]="mode() === 'global'" (click)="loadGlobalRewards()" [disabled]="loading()">
+        LOAD&nbsp;GLOBAL&nbsp;INDEX
+      </button>
+      <span class="count">
+        {{ filtered().length }}<i>/</i>{{ items().length }}
+      </span>
+    </div>
+
+    <!-- Progress bar during global index load -->
+    @if (mode() === 'global' && scanProgress().total > 0) {
+      <div class="progress">
+        <div class="progress__bar">
+          <span class="progress__fill" [style.width.%]="progressPercent()"></span>
+        </div>
+        <span class="progress__num">
+          {{ scanProgress().done }}<i>/</i>{{ scanProgress().total }}
+          @if (!loading()) { <em>· loaded</em> }
+        </span>
+      </div>
+    }
+
+    @if (topGames().length > 1) {
+      <div class="chips chips--games" aria-label="Top games">
+        <button
+          type="button"
+          class="chip chip--all"
+            [class.active]="mode() === 'top'"
+          (click)="returnToTopGames()">
+            TOP10
+        </button>
+        @for (game of topGames(); track game.appid) {
+          <button
+            type="button"
+            class="chip chip--game"
+            [class.active]="isTopGameActive(game.appid)"
+            (click)="toggleApp(game.appid)">
+            {{ game.name }}
+          </button>
+        }
+        <button
+          type="button"
+          class="chip chip--other"
+          [class.active]="isOtherGameActive()"
+          (click)="openOtherGameSearch()">
+          OTHER
+        </button>
+      </div>
+    }
+
+    @if (availableClasses().length) {
+      <div class="chips chips--classes" aria-label="Item categories">
+        <button
+          type="button"
+          class="chip chip--all"
+          [class.active]="selectedClass() === null"
+          (click)="clearClass()">
+          ALL
+        </button>
+        @for (c of availableClasses(); track c) {
+          <button
+            type="button"
+            class="chip"
+            [class.active]="selectedClass() === c"
+            (click)="toggleClass(c)">
+            {{ classLabelFor(c) }}
+          </button>
+        }
+      </div>
+    }
+  </section>
+
+  <section class="results-stage" [style.minHeight.px]="resultsMinHeight()">
+    @if (loading() && items().length === 0) {
+      <div class="status">
+        <span class="blip"></span>
+        @if (mode() === 'global') {
+          <span>loading up to {{ globalRewardLimit }} rewards from Steam's global points-shop index…</span>
+        } @else if (mode() === 'top') {
+          <span>loading the {{ topSellingLimit }} most sold points-shop rewards…</span>
+        } @else {
+          <span>querying ILoyaltyRewardsService for <b>{{ selectedGame().name }}</b>…</span>
+        }
+      </div>
+    } @else if (otherGamePrompt()) {
+      <div class="status">
+        search for another game by name or appid in the <b>GAME</b> field, then press <b>FETCH</b>.
+      </div>
+    } @else if (error()) {
+      <div class="status status--err">
+        <span class="x">✕</span>
+        <span>{{ error() }} — verify <code>npm start</code> is using the proxy.</span>
+      </div>
+    } @else if (filtered().length === 0 && !loading()) {
+      <div class="status">
+        no entries match.
+        @if (mode() === 'single') { try a different game or click <b>LOAD GLOBAL INDEX</b>. }
+        @if (mode() === 'top') { click <b>LOAD GLOBAL INDEX</b> to search more rewards. }
+      </div>
+    }
+
+    @if (visibleRows().length > 0) {
+      <section class="manifest">
+        <div class="manifest__head">
+          <span>#</span>
+          <span>thumb</span>
+          <span>title</span>
+          <span>class</span>
+          <span class="r">cost</span>
+          <span class="c">links</span>
+        </div>
+
+        @for (it of visibleRows(); track it.appid + '-' + it.defid; let i = $index) {
+          <div class="row">
+            <span class="i">{{ pad(i + 1) }}</span>
+            <span class="t">
+              @if (thumbUrl(it); as u) {
+                <app-static-thumbnail [src]="u" alt="" />
+              } @else {
+                <span class="t__none"></span>
+              }
+            </span>
+            <span
+              class="ttl"
+              role="button"
+              tabindex="0"
+              [class.ttl--previewed]="isPreviewed(it)"
+              [attr.aria-label]="previewLabel(it)"
+              [attr.aria-expanded]="isPreviewed(it)"
+              (mouseenter)="hovered.set(it); onMouseMove($any($event))"
+              (mousemove)="onMouseMove($event)"
+              (mouseleave)="hovered.set(null)"
+              (focus)="showPreviewFromElement(it, $event)"
+              (blur)="hovered.set(null)"
+              (click)="togglePreview(it, $event)"
+              (keydown.enter)="togglePreview(it, $event)"
+              (keydown.space)="togglePreview(it, $event)">
+              <span class="ttl__name">{{ itemTitle(it) }}</span>
+              @if (mode() !== 'single') {
+                <span class="ttl__app">{{ appLabel(it.appid) }}</span>
+              }
+            </span>
+            <span class="cls">{{ classLabel(it) }}</span>
+            <span class="cost">{{ it.point_cost }}<em>p</em></span>
+            <span class="acts c">
+              @if (assetHref(it); as u) {
+                <a [href]="u" target="_blank" rel="noopener" title="Open raw asset">↓</a>
+              } @else {
+                <span class="acts__none">—</span>
+              }
+              <a [href]="shopHref(it)" target="_blank" rel="noopener" title="Open shop page">↗</a>
+            </span>
+          </div>
+        }
+
+        @if (truncated()) {
+          <div class="overflow">
+            rendering first {{ visibleRows().length }} of {{ filtered().length }} matches —
+            narrow your <span class="kbd">/</span> filter to see the rest.
+          </div>
+        }
+      </section>
+    }
+  </section>
+
+  @if (hovered(); as h) {
+    <div class="floater"
+      [style.left.px]="cursor().x"
+      [style.top.px]="cursor().y">
+      <app-preview-card [item]="h" [appName]="appLabel(h.appid)" [muted]="soundMuted()" />
+    </div>
+  }
+
+  <footer class="legend">
+    <span>cdn&nbsp;·&nbsp;cloudflare.steamstatic.com</span>
+    <span>endpoint&nbsp;·&nbsp;QueryRewardItems/v1</span>
+    <span>angular&nbsp;·&nbsp;v21</span>
+    <span class="legend__r">EOF</span>
+  </footer>
+</main>
