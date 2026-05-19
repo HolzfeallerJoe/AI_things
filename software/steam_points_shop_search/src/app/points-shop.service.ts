@@ -1,7 +1,19 @@
 import { HttpClient } from '@angular/common/http';
 import { Injectable, inject } from '@angular/core';
-import { Observable, catchError, forkJoin, map, of, switchMap } from 'rxjs';
-import { QueryRewardsResponse, RewardDefinition } from './reward.model';
+import {
+  Observable,
+  Subscription,
+  catchError,
+  finalize,
+  from,
+  map,
+  mergeMap,
+  of,
+  shareReplay,
+  switchMap,
+  toArray,
+} from 'rxjs';
+import { QueryRewardsResponse, RewardDefinition, rewardClassLabel, rewardTitle } from './reward.model';
 
 export interface AppHit {
   appid: number;
@@ -14,6 +26,17 @@ export interface RewardPage {
   items: RewardDefinition[];
   total: number;
   count: number;
+  nextCursor?: string;
+}
+
+export interface RewardScanProgress {
+  scanned: number;
+  total: number;
+  matches: number;
+}
+
+export interface RewardScanResult extends RewardScanProgress {
+  items: RewardDefinition[];
 }
 
 export interface TopGame {
@@ -25,6 +48,13 @@ export interface TopGame {
 interface RewardQueryOptions {
   sort?: number;
   sortDescending?: boolean;
+  cursor?: string;
+}
+
+interface RewardScanOptions {
+  getKnownAppName?: (appid: number) => string | undefined;
+  onProgress?: (progress: RewardScanProgress) => void;
+  pageDelayMs?: number;
 }
 
 interface RawAppHit {
@@ -46,6 +76,10 @@ interface AppDetailsResponse {
 @Injectable({ providedIn: 'root' })
 export class PointsShopService {
   private http = inject(HttpClient);
+  private readonly globalScanPageDelayMs = 5000;
+  private readonly appNameConcurrency = 1;
+  private appNameCache = new Map<number, string>();
+  private appNameRequests = new Map<number, Observable<string>>();
 
   queryRewards(appid: number): Observable<RewardDefinition[]> {
     const input = encodeURIComponent(JSON.stringify({ appids: [appid] }));
@@ -81,21 +115,12 @@ export class PointsShopService {
         }
         return [...seen.values()]
           .sort((a, b) => b.count - a.count || a.rank - b.rank)
-          .slice(0, safeLimit);
-      }),
-      switchMap((apps) => {
-        if (!apps.length) return of([]);
-        return forkJoin(
-          apps.map((app) =>
-            this.getAppName(app.appid).pipe(
-              map((name) => ({
-                appid: app.appid,
-                name,
-                count: app.count,
-              })),
-            ),
-          ),
-        );
+          .slice(0, safeLimit)
+          .map((app) => ({
+            appid: app.appid,
+            name: this.appNameCache.get(app.appid) ?? '',
+            count: app.count,
+          }));
       }),
     );
   }
@@ -104,22 +129,96 @@ export class PointsShopService {
     return this.queryRewardPage(count);
   }
 
+  scanGlobalRewards(query: string, options: RewardScanOptions = {}): Observable<RewardScanResult> {
+    const needle = query.trim().toLowerCase();
+    if (!needle) {
+      return of({ items: [], scanned: 0, total: 0, matches: 0 });
+    }
+
+    return new Observable<RewardScanResult>((subscriber) => {
+      const matches: RewardDefinition[] = [];
+      const seen = new Set<string>();
+      let activeRequest: Subscription | null = null;
+      let nextPageTimer: ReturnType<typeof setTimeout> | null = null;
+      let scanned = 0;
+      let total = 0;
+      const pageDelayMs = options.pageDelayMs ?? this.globalScanPageDelayMs;
+
+      const emitProgress = () => {
+        const progress = {
+          scanned,
+          total: total || scanned,
+          matches: matches.length,
+        };
+        options.onProgress?.(progress);
+        subscriber.next({ ...progress, items: [...matches] });
+      };
+
+      const requestPage = (cursor?: string) => {
+        if (subscriber.closed) return;
+
+        activeRequest = this.queryRewardPage(1000, { cursor }).subscribe({
+          next: (page) => {
+            if (subscriber.closed) return;
+
+            scanned += Math.max(page.count, page.items.length);
+            total = page.total || total;
+
+            for (const item of page.items) {
+              const key = rewardKey(item);
+              if (seen.has(key)) continue;
+              if (!rewardMatchesQuery(item, needle, options.getKnownAppName?.(item.appid))) continue;
+
+              seen.add(key);
+              matches.push(item);
+            }
+
+            emitProgress();
+
+            if (page.nextCursor && page.count > 0) {
+              if (pageDelayMs <= 0) {
+                requestPage(page.nextCursor);
+                return;
+              }
+
+              nextPageTimer = setTimeout(() => requestPage(page.nextCursor), pageDelayMs);
+              return;
+            }
+
+            subscriber.complete();
+          },
+          error: (error) => subscriber.error(error),
+        });
+      };
+
+      requestPage();
+
+      return () => {
+        if (nextPageTimer) clearTimeout(nextPageTimer);
+        activeRequest?.unsubscribe();
+      };
+    });
+  }
+
   private queryRewardPage(count: number, options: RewardQueryOptions = {}): Observable<RewardPage> {
     const requested = Number.isFinite(count) ? Math.floor(count) : 1000;
     const safeCount = Math.max(1, Math.min(requested, 1000));
-    const inputPayload: Record<string, number | boolean> = { count: safeCount };
+    const inputPayload: Record<string, number | boolean | string> = { count: safeCount };
     if (options.sort != null) inputPayload['sort'] = options.sort;
     if (options.sortDescending != null) inputPayload['sort_descending'] = options.sortDescending;
+    if (options.cursor) inputPayload['cursor'] = options.cursor;
     const input = encodeURIComponent(JSON.stringify(inputPayload));
     const url = `/steam-api/ILoyaltyRewardsService/QueryRewardItems/v1/?input_json=${input}`;
     return this.http.get<QueryRewardsResponse>(url).pipe(
       map((res) => {
         const items = uniqueRewards(res?.response?.definitions ?? []);
-        return {
+        const page: RewardPage = {
           items,
           total: res?.response?.total_count ?? 0,
           count: res?.response?.count ?? items.length,
         };
+        if (res?.response?.next_cursor) page.nextCursor = res.response.next_cursor;
+        return page;
       }),
     );
   }
@@ -142,6 +241,46 @@ export class PointsShopService {
   }
 
   getAppName(appid: number): Observable<string> {
+    if (!Number.isFinite(appid) || appid <= 0) return of('Unknown app');
+
+    const cached = this.appNameCache.get(appid);
+    if (cached) return of(cached);
+
+    const active = this.appNameRequests.get(appid);
+    if (active) return active;
+
+    const request = this.fetchAppName(appid).pipe(
+      map((name) => normalizeAppName(name)),
+      map((name) => {
+        if (!/^unknown app$/i.test(name)) this.appNameCache.set(appid, name);
+        return name;
+      }),
+      finalize(() => this.appNameRequests.delete(appid)),
+      shareReplay({ bufferSize: 1, refCount: false }),
+    );
+
+    this.appNameRequests.set(appid, request);
+    return request;
+  }
+
+  getAppNames(appids: number[]): Observable<{ appid: number; name: string }[]> {
+    const ids = [...new Set(appids)]
+      .filter((appid) => Number.isFinite(appid) && appid > 0);
+    if (!ids.length) return of([]);
+
+    return from(ids).pipe(
+      mergeMap(
+        (appid) => this.getAppName(appid).pipe(
+          map((name) => ({ appid, name })),
+        ),
+        this.appNameConcurrency,
+      ),
+      toArray(),
+      map((apps) => apps.sort((a, b) => ids.indexOf(a.appid) - ids.indexOf(b.appid))),
+    );
+  }
+
+  private fetchAppName(appid: number): Observable<string> {
     const url = `/steam-store/api/appdetails?appids=${appid}&filters=basic`;
     return this.http.get<AppDetailsResponse>(url).pipe(
       map((res) => res[String(appid)]?.data?.name || ''),
@@ -181,12 +320,36 @@ function decodeHtmlText(value: string): string {
     .replace(/&gt;/g, '>');
 }
 
+function normalizeAppName(name: string): string {
+  const normalized = name.trim();
+  return normalized || 'Unknown app';
+}
+
 function uniqueRewards(items: RewardDefinition[]): RewardDefinition[] {
   const seen = new Set<string>();
   return items.filter((item) => {
-    const key = `${item.appid}:${item.defid}`;
+    const key = rewardKey(item);
     if (seen.has(key)) return false;
     seen.add(key);
     return true;
   });
+}
+
+function rewardKey(item: RewardDefinition): string {
+  return `${item.appid}:${item.defid}`;
+}
+
+function rewardMatchesQuery(item: RewardDefinition, needle: string, knownAppName: string | undefined): boolean {
+  const data = item.community_item_data;
+  return [
+    rewardTitle(item),
+    data?.item_name ?? '',
+    data?.item_description ?? '',
+    item.internal_description ?? '',
+    knownAppName ?? '',
+    String(item.appid),
+    String(item.defid),
+    rewardClassLabel(item.community_item_class),
+    item.point_cost,
+  ].join(' ').toLowerCase().includes(needle);
 }

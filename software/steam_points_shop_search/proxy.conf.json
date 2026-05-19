@@ -19,5 +19,12 @@
     "changeOrigin": true,
     "pathRewrite": { "^/steam-store": "" },
     "logLevel": "info"
+  },
+  "/steam-assets": {
+    "target": "https://shared.cloudflare.steamstatic.com/community_assets/images/items",
+    "secure": true,
+    "changeOrigin": true,
+    "pathRewrite": { "^/steam-assets": "" },
+    "logLevel": "info"
   }
 }

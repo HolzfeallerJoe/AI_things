@@ -17,6 +17,9 @@ import {
   distinctUntilChanged,
   finalize,
   forkJoin,
+  from,
+  map,
+  mergeMap,
   of,
   switchMap,
 } from 'rxjs';
@@ -26,10 +29,10 @@ import {
   RewardDefinition,
   buildAssetUrl,
   buildShopUrl,
+  rewardDownloadFile,
   rewardClassLabel,
   rewardHasAnimation,
-  rewardImageFile,
-  rewardSmallVideoFile,
+  rewardIsAnimatedImage,
   rewardThumbnailFile,
   rewardTitle,
 } from './reward.model';
@@ -39,11 +42,12 @@ import { StaticThumbnail } from './static-thumbnail';
 const FLOATER_W = 380;
 const FLOATER_H = 460;
 const FLOATER_MARGIN = 22;
-const MAX_RENDERED_ROWS = 400;
+const DEFAULT_PAGE_SIZE = 10;
 const GLOBAL_REWARD_LIMIT = 1000;
 const TOP_SELLING_LIMIT = 10;
 const TOP_GAME_LIMIT = 10;
 const TOP_GAME_SAMPLE_LIMIT = 1000;
+const APP_NAME_LOOKUP_CONCURRENCY = 1;
 const HIDDEN_CLASS_FILTERS = new Set([0]);
 
 @Component({
@@ -62,9 +66,11 @@ export class App implements OnInit {
   readonly globalRewardLimit = GLOBAL_REWARD_LIMIT;
   readonly topSellingLimit = TOP_SELLING_LIMIT;
   readonly topGameLimit = TOP_GAME_LIMIT;
+  readonly pageSizeOptions = [10, 25, 50, 100];
 
   // Names are learned from live Steam app search results and manually selected games.
   private appNames = new Map<number, string>([[730, 'Counter-Strike 2']]);
+  private pendingAppNameIds = new Set<number>();
   private appNameVersion = signal(0);
   private activeRequest: Subscription | null = null;
   private activeOperation = 0;
@@ -91,6 +97,7 @@ export class App implements OnInit {
   error = signal<string | null>(null);
   scanProgress = signal<{ done: number; total: number }>({ done: 0, total: 0 });
   globalTotalCount = signal<number | null>(null);
+  downloadingAsset = signal<string | null>(null);
 
   // -- UI -------------------------------------------------------------------
   hovered = signal<RewardDefinition | null>(null);
@@ -98,6 +105,8 @@ export class App implements OnInit {
   resultsMinHeight = signal<number>(0);
   otherGamePrompt = signal<boolean>(false);
   soundMuted = signal<boolean>(true);
+  page = signal<number>(1);
+  pageSize = signal<number>(DEFAULT_PAGE_SIZE);
 
   constructor() {
     this.pickerInput$
@@ -123,6 +132,7 @@ export class App implements OnInit {
         this.gamePickerOpen.set(hits.length > 0);
         this.activeSuggestionIndex.set(hits.length > 0 ? 0 : -1);
       });
+
   }
 
   // -- Derived --------------------------------------------------------------
@@ -149,9 +159,22 @@ export class App implements OnInit {
     });
   });
 
-  visibleRows = computed(() => this.filtered().slice(0, MAX_RENDERED_ROWS));
+  totalPages = computed(() => Math.max(1, Math.ceil(this.filtered().length / this.pageSize())));
 
-  truncated = computed(() => this.filtered().length > MAX_RENDERED_ROWS);
+  currentPage = computed(() => Math.min(Math.max(1, this.page()), this.totalPages()));
+
+  pageStartIndex = computed(() => {
+    if (!this.filtered().length) return 0;
+    return (this.currentPage() - 1) * this.pageSize();
+  });
+
+  pageEndIndex = computed(() => Math.min(this.pageStartIndex() + this.pageSize(), this.filtered().length));
+
+  visibleRows = computed(() => this.filtered().slice(this.pageStartIndex(), this.pageEndIndex()));
+
+  hasPreviousPage = computed(() => this.currentPage() > 1);
+
+  hasNextPage = computed(() => this.currentPage() < this.totalPages());
 
   availableClasses = computed(() => {
     const set = new Set<number>();
@@ -194,6 +217,30 @@ export class App implements OnInit {
   onGamePickerInput(value: string): void {
     this.gamePickerInput.set(value);
     this.pickerInput$.next(value);
+  }
+
+  onQueryInput(value: string): void {
+    this.query.set(value);
+    this.resetPage();
+  }
+
+  onPageSizeInput(value: string | number): void {
+    const next = Number(value);
+    if (!Number.isFinite(next) || next <= 0) return;
+    this.pageSize.set(Math.floor(next));
+    this.resetPage();
+  }
+
+  goToPage(page: number): void {
+    this.page.set(Math.min(Math.max(1, Math.floor(page)), this.totalPages()));
+  }
+
+  previousPage(): void {
+    this.goToPage(this.currentPage() - 1);
+  }
+
+  nextPage(): void {
+    this.goToPage(this.currentPage() + 1);
   }
 
   onGamePickerFocus(): void {
@@ -299,6 +346,7 @@ export class App implements OnInit {
     this.selectedClass.set(null);
     this.scanProgress.set({ done: 0, total: 0 });
     this.globalTotalCount.set(null);
+    this.resetPage();
 
     this.activeRequest = this.shop.queryRewards(id).pipe(
       takeUntilDestroyed(this.destroyRef),
@@ -331,6 +379,7 @@ export class App implements OnInit {
     this.selectedClass.set(null);
     this.globalTotalCount.set(null);
     this.scanProgress.set({ done: 0, total: TOP_SELLING_LIMIT });
+    this.resetPage();
 
     this.activeRequest = forkJoin({
       rewards: this.shop.queryTopSellingRewards(TOP_SELLING_LIMIT),
@@ -342,9 +391,12 @@ export class App implements OnInit {
       next: ({ rewards, games }) => {
         if (!this.isActiveOperation(operation)) return;
         this.items.set(rewards.items);
-        this.rememberRewardAppNames(rewards.items);
         this.topGames.set(games);
         this.rememberTopGameNames(games);
+        this.rememberAppIds([
+          ...rewards.items.map((it) => it.appid),
+          ...games.map((game) => game.appid),
+        ]);
         this.globalTotalCount.set(rewards.total);
         this.scanProgress.set({
           done: rewards.count,
@@ -359,6 +411,12 @@ export class App implements OnInit {
   }
 
   loadGlobalRewards(): void {
+    const q = this.query().trim();
+    if (q) {
+      this.scanGlobalRewardsForQuery(q);
+      return;
+    }
+
     const operation = this.startOperation();
     this.clearGamePicker();
     this.mode.set('global');
@@ -373,6 +431,7 @@ export class App implements OnInit {
     this.selectedClass.set(null);
     this.globalTotalCount.set(null);
     this.scanProgress.set({ done: 0, total: GLOBAL_REWARD_LIMIT });
+    this.resetPage();
 
     this.activeRequest = forkJoin({
       rewards: this.shop.queryGlobalRewards(GLOBAL_REWARD_LIMIT),
@@ -384,11 +443,17 @@ export class App implements OnInit {
       next: ({ rewards, games }) => {
         if (!this.isActiveOperation(operation)) return;
         this.items.set(rewards.items);
-        this.rememberRewardAppNames(rewards.items);
         this.topGames.set(games);
         this.rememberTopGameNames(games);
+        this.rememberAppIds([
+          ...rewards.items.map((it) => it.appid),
+          ...games.map((game) => game.appid),
+        ]);
         this.globalTotalCount.set(rewards.total);
-        this.scanProgress.set({ done: rewards.count, total: rewards.total || rewards.count });
+        this.scanProgress.set({
+          done: rewards.count,
+          total: rewards.total || rewards.count,
+        });
       },
       error: (e: { message?: string }) => {
         if (!this.isActiveOperation(operation)) return;
@@ -397,15 +462,68 @@ export class App implements OnInit {
     });
   }
 
+  scanGlobalRewardsForQuery(term: string): void {
+    const operation = this.startOperation();
+    this.clearGamePicker();
+    this.mode.set('global');
+    this.loading.set(true);
+    this.error.set(null);
+    this.otherGamePrompt.set(false);
+    this.preserveResultsHeight();
+    this.items.set([]);
+    this.hovered.set(null);
+    this.selectedAppId.set(null);
+    this.selectedClass.set(null);
+    this.globalTotalCount.set(null);
+    this.scanProgress.set({ done: 0, total: 0 });
+    this.resetPage();
+
+    this.activeRequest = this.shop.scanGlobalRewards(term, {
+      getKnownAppName: (appid) => this.appNames.get(appid),
+      onProgress: (progress) => {
+        if (!this.isActiveOperation(operation)) return;
+        this.globalTotalCount.set(progress.total);
+        this.scanProgress.set({ done: progress.scanned, total: progress.total });
+      },
+    }).pipe(
+      takeUntilDestroyed(this.destroyRef),
+      finalize(() => this.finishOperation(operation)),
+    ).subscribe({
+      next: (scan) => {
+        if (!this.isActiveOperation(operation)) return;
+        this.items.set(scan.items);
+        this.rememberRewardAppNames(this.visibleRows());
+        this.globalTotalCount.set(scan.total);
+        this.scanProgress.set({ done: scan.scanned, total: scan.total });
+      },
+      error: (e: { message?: string }) => {
+        if (!this.isActiveOperation(operation)) return;
+        this.error.set(e?.message ?? 'global search failed');
+      },
+      complete: () => {
+        if (!this.isActiveOperation(operation)) return;
+        this.rememberRewardAppNames(this.visibleRows());
+      },
+    });
+  }
+
+  stopSearch(): void {
+    this.startOperation();
+    this.loading.set(false);
+    this.error.set(null);
+    this.rememberRewardAppNames(this.visibleRows());
+  }
+
   // -- Class filter ---------------------------------------------------------
 
   toggleApp(appid: number): void {
     const game = this.topGames().find((g) => g.appid === appid);
-    this.pickAppId(appid, game?.name ?? this.appLabel(appid));
+    this.pickAppId(appid, game?.name || this.appLabel(appid));
   }
 
   clearApp(): void {
     this.selectedAppId.set(null);
+    this.resetPage();
   }
 
   returnToTopGames(): void {
@@ -430,6 +548,7 @@ export class App implements OnInit {
     this.selectedClass.set(null);
     this.scanProgress.set({ done: 0, total: 0 });
     this.globalTotalCount.set(null);
+    this.resetPage();
     this.clearGamePicker();
 
     setTimeout(() => {
@@ -440,10 +559,12 @@ export class App implements OnInit {
 
   toggleClass(c: number): void {
     this.selectedClass.set(this.selectedClass() === c ? null : c);
+    this.resetPage();
   }
 
   clearClass(): void {
     this.selectedClass.set(null);
+    this.resetPage();
   }
 
   isTopGameActive(appid: number): boolean {
@@ -507,7 +628,40 @@ export class App implements OnInit {
   }
 
   assetHref(it: RewardDefinition): string | null {
-    return buildAssetUrl(it.appid, rewardSmallVideoFile(it) ?? rewardImageFile(it));
+    return buildAssetUrl(it.appid, rewardDownloadFile(it));
+  }
+
+  isDownloadingAsset(it: RewardDefinition): boolean {
+    return this.downloadingAsset() === this.rewardKey(it);
+  }
+
+  async downloadAsset(it: RewardDefinition, ev?: Event): Promise<void> {
+    ev?.preventDefault();
+    const href = this.assetHref(it);
+    if (!href) return;
+
+    const key = this.rewardKey(it);
+    this.downloadingAsset.set(key);
+    try {
+      const res = await fetch(this.downloadFetchUrl(href));
+      if (!res.ok) throw new Error(`download failed (${res.status})`);
+
+      const blob = await res.blob();
+      const objectUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = objectUrl;
+      a.download = this.assetFilename(it, href);
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(objectUrl);
+    } catch (error) {
+      this.error.set(error instanceof Error ? error.message : 'download failed');
+      window.open(href, '_blank', 'noopener');
+    } finally {
+      if (this.downloadingAsset() === key) this.downloadingAsset.set(null);
+    }
   }
 
   shopHref(it: RewardDefinition): string {
@@ -528,7 +682,12 @@ export class App implements OnInit {
 
   appLabel(appid: number): string {
     this.appNameVersion();
-    return this.appNames.get(appid) ?? 'Unknown app';
+    return this.appNames.get(appid) ?? `App ${appid}`;
+  }
+
+  topGameLabel(game: TopGame): string {
+    this.appNameVersion();
+    return game.name || this.appNames.get(game.appid) || `App ${game.appid}`;
   }
 
   suggestionId(hit: AppHit): string {
@@ -563,13 +722,15 @@ export class App implements OnInit {
   progressPercent(): number {
     const p = this.scanProgress();
     if (p.total === 0) return 0;
-    return Math.round((p.done / p.total) * 100);
+    return Math.min(100, Math.round((p.done / p.total) * 100));
   }
 
   private itemSearchText(it: RewardDefinition): string {
     return [
       rewardTitle(it),
+      it.community_item_data?.item_name ?? '',
       it.community_item_data?.item_description ?? '',
+      it.internal_description ?? '',
       this.appLabel(it.appid),
       String(it.appid),
       String(it.defid),
@@ -578,11 +739,42 @@ export class App implements OnInit {
     ].join(' ').toLowerCase();
   }
 
+  private downloadFetchUrl(href: string): string {
+    try {
+      const url = new URL(href);
+      if (url.hostname === 'shared.cloudflare.steamstatic.com') {
+        return `/steam-assets${url.pathname.replace('/community_assets/images/items', '')}`;
+      }
+    } catch {
+      return href;
+    }
+    return href;
+  }
+
+  private assetFilename(it: RewardDefinition, href: string): string {
+    const rawExt = href.split('?')[0]?.split('.').pop() || 'bin';
+    const ext = rewardIsAnimatedImage(it) && rawExt.toLowerCase() === 'png' ? 'apng' : rawExt;
+    const safeTitle = rewardTitle(it)
+      .trim()
+      .replace(/[^a-z0-9._-]+/gi, '-')
+      .replace(/^-+|-+$/g, '')
+      .slice(0, 80) || `reward-${it.defid}`;
+    return `${safeTitle}-${it.appid}-${it.defid}.${ext}`;
+  }
+
+  private rewardKey(it: RewardDefinition): string {
+    return `${it.appid}:${it.defid}`;
+  }
+
   private startOperation(): number {
     this.activeOperation += 1;
     this.activeRequest?.unsubscribe();
     this.activeRequest = null;
     return this.activeOperation;
+  }
+
+  private resetPage(): void {
+    this.page.set(1);
   }
 
   private clearGamePicker(): void {
@@ -600,27 +792,34 @@ export class App implements OnInit {
   }
 
   private rememberRewardAppNames(items: RewardDefinition[]): void {
-    const ids = [...new Set(items.map((it) => it.appid))]
-      .filter((appid) => !this.appNames.has(appid));
+    this.rememberAppIds(items.map((it) => it.appid));
+  }
+
+  private rememberAppIds(appids: number[]): void {
+    const ids = [...new Set(appids)]
+      .filter((appid) => !this.appNames.has(appid) && !this.pendingAppNameIds.has(appid));
     if (!ids.length) return;
 
-    forkJoin(
-      ids.map((appid) =>
-        this.shop.getAppName(appid).pipe(
-          switchMap((name) => of({ appid, name })),
+    for (const appid of ids) {
+      this.pendingAppNameIds.add(appid);
+    }
+
+    from(ids).pipe(
+      mergeMap(
+        (appid) => this.shop.getAppName(appid).pipe(
+          map((name) => ({ appid, name })),
+          finalize(() => this.pendingAppNameIds.delete(appid)),
         ),
+        APP_NAME_LOOKUP_CONCURRENCY,
       ),
-    ).pipe(
       takeUntilDestroyed(this.destroyRef),
-    ).subscribe((apps) => {
-      for (const app of apps) {
-        this.rememberAppName(app.appid, app.name);
-      }
+    ).subscribe((app) => {
+      this.rememberAppName(app.appid, app.name);
     });
   }
 
   private rememberAppName(appid: number, name: string): void {
-    if (!name || this.appNames.get(appid) === name) return;
+    if (!name || /^unknown app$/i.test(name) || this.appNames.get(appid) === name) return;
     this.appNames.set(appid, name);
     this.appNameVersion.update((version) => version + 1);
   }

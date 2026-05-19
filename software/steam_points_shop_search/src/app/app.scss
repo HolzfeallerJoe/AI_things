@@ -117,7 +117,6 @@
   }
   p { margin: 0 0 10px; }
   b { color: var(--accent); font-weight: 500; }
-  .mono-note { margin-top: 16px; color: var(--dim); font-size: 10px; letter-spacing: 0.15em; }
 }
 
 @keyframes pulse {
@@ -378,6 +377,69 @@
   }
 }
 
+/* Pagination -------------------------------------------------------------- */
+
+.pager {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 9px 14px;
+  border: 1px solid var(--border);
+  background: var(--surface);
+  font-family: var(--mono);
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  color: var(--muted);
+
+  @media (max-width: 780px) { align-items: stretch; flex-direction: column; }
+
+  &__summary,
+  &__controls,
+  &__size {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  &__summary {
+    min-width: 0;
+    font-variant-numeric: tabular-nums;
+
+    span { color: var(--dim); letter-spacing: 0.18em; }
+    b { color: var(--text); font-weight: 500; }
+    i { color: var(--dim); font-style: normal; }
+    em { color: var(--accent); font-style: normal; margin-left: 8px; }
+  }
+
+  &__controls { flex-wrap: wrap; justify-content: flex-end; }
+
+  &__btn,
+  select {
+    border: 1px solid var(--border);
+    background: var(--surface-2);
+    color: var(--muted);
+    font-family: var(--mono);
+    font-size: 10px;
+    letter-spacing: 0.1em;
+  }
+
+  &__btn {
+    padding: 5px 9px;
+    cursor: pointer;
+    transition: border-color 0.15s, color 0.15s, background 0.15s;
+
+    &:hover:not(:disabled),
+    &:focus-visible { border-color: var(--accent); color: var(--accent); outline: 0; }
+    &:disabled { opacity: 0.38; cursor: default; }
+  }
+
+  &__size {
+    color: var(--dim);
+    select { padding: 4px 7px; color: var(--text); outline: 0; }
+  }
+}
+
 /* Filter chips ------------------------------------------------------------ */
 
 .chips {
@@ -611,21 +673,27 @@ $cols: 60px 56px minmax(0, 1fr) 200px 100px 90px;
     gap: 6px;
     justify-content: center;
 
-    a {
+    a,
+    button {
       width: 28px; height: 28px;
       border: 1px solid var(--border);
+      background: transparent;
       display: grid;
       place-items: center;
       color: var(--muted);
       text-decoration: none;
       font-size: 13px;
+      font-family: var(--mono);
+      cursor: pointer;
       transition: all 0.15s;
 
-      &:hover {
+      &:hover:not(:disabled) {
         border-color: var(--accent);
         color: var(--accent);
         background: var(--accent-soft);
       }
+
+      &:disabled { cursor: progress; opacity: 0.6; }
     }
     &__none {
       width: 28px; height: 28px;

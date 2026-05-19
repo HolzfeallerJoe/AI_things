@@ -33,6 +33,7 @@ export interface QueryRewardsResponse {
     definitions?: RewardDefinition[];
     total_count?: number;
     count?: number;
+    next_cursor?: string;
   };
 }
 
@@ -84,6 +85,10 @@ export function rewardPreviewImageFile(it: RewardDefinition): string | undefined
   return d?.item_image_large ?? d?.item_image_small;
 }
 
+export function rewardDownloadFile(it: RewardDefinition): string | undefined {
+  return rewardVideoFile(it) ?? rewardPreviewImageFile(it);
+}
+
 export function rewardVideoFile(it: RewardDefinition): string | undefined {
   const d = it.community_item_data;
   return d?.movie_webm
@@ -106,11 +111,15 @@ export function rewardSmallVideoFile(it: RewardDefinition): string | undefined {
 }
 
 export function rewardHasAnimation(it: RewardDefinition): boolean {
-  return it.community_item_data?.animated === true || rewardVideoFile(it) != null;
+  return isAnimatedImageReward(it) || rewardVideoFile(it) != null;
+}
+
+export function rewardIsAnimatedImage(it: RewardDefinition): boolean {
+  return isAnimatedImageReward(it);
 }
 
 function isAnimatedImageReward(it: RewardDefinition): boolean {
-  return it.community_item_data?.animated === true && !rewardVideoFile(it);
+  return (it.community_item_data?.animated === true || it.community_item_class === 11) && !rewardVideoFile(it);
 }
 
 export function rewardTitle(it: RewardDefinition): string {

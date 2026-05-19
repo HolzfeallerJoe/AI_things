@@ -4,8 +4,10 @@ import {
   buildAssetUrl,
   buildShopUrl,
   rewardClassLabel,
+  rewardDownloadFile,
   rewardHasAnimation,
   rewardImageFile,
+  rewardIsAnimatedImage,
   rewardPreviewImageFile,
   rewardSmallVideoFile,
   rewardThumbnailFile,
@@ -102,6 +104,51 @@ describe('reward model helpers', () => {
 
     expect(rewardThumbnailFile(item)).toBe('frame-static.png');
     expect(rewardPreviewImageFile(item)).toBe('frame-animated.png');
+    expect(rewardDownloadFile(item)).toBe('frame-animated.png');
     expect(rewardHasAnimation(item)).toBe(true);
+    expect(rewardIsAnimatedImage(item)).toBe(true);
+  });
+
+  it('treats class 11 stickers as animated images even when Steam omits the animated flag', () => {
+    const item = {
+      defid: 78792,
+      appid: 1263950,
+      type: 1,
+      community_item_class: 11,
+      point_cost: '1000',
+      community_item_data: {
+        item_image_small: 'sticker-animated.png',
+        item_image_large: 'sticker-static.png',
+        animated: false,
+      },
+    } satisfies RewardDefinition;
+
+    expect(rewardThumbnailFile(item)).toBe('sticker-static.png');
+    expect(rewardPreviewImageFile(item)).toBe('sticker-animated.png');
+    expect(rewardDownloadFile(item)).toBe('sticker-animated.png');
+    expect(rewardHasAnimation(item)).toBe(true);
+    expect(rewardIsAnimatedImage(item)).toBe(true);
+  });
+
+  it('prefers video assets over class 11 animated-image sticker handling', () => {
+    const item = {
+      defid: 78792,
+      appid: 1263950,
+      type: 1,
+      community_item_class: 11,
+      point_cost: '1000',
+      community_item_data: {
+        item_image_small: 'sticker-small.png',
+        item_image_large: 'sticker-large.png',
+        movie_webm: 'sticker.webm',
+        animated: false,
+      },
+    } satisfies RewardDefinition;
+
+    expect(rewardVideoFile(item)).toBe('sticker.webm');
+    expect(rewardThumbnailFile(item)).toBe('sticker-small.png');
+    expect(rewardPreviewImageFile(item)).toBe('sticker-large.png');
+    expect(rewardDownloadFile(item)).toBe('sticker.webm');
+    expect(rewardIsAnimatedImage(item)).toBe(false);
   });
 });

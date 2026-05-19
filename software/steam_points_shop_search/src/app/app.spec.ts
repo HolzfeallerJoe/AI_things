@@ -1,5 +1,5 @@
 import { TestBed } from '@angular/core/testing';
-import { Subject, of } from 'rxjs';
+import { Observable, Subject, of } from 'rxjs';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { App } from './app';
 import { AppHit, PointsShopService } from './points-shop.service';
@@ -12,7 +12,9 @@ describe('App', () => {
     queryTopSellingRewards: ReturnType<typeof vi.fn>;
     queryTopGames: ReturnType<typeof vi.fn>;
     queryGlobalRewards: ReturnType<typeof vi.fn>;
+    scanGlobalRewards: ReturnType<typeof vi.fn>;
     getAppName: ReturnType<typeof vi.fn>;
+    getAppNames: ReturnType<typeof vi.fn>;
   };
 
   beforeEach(() => {
@@ -22,7 +24,9 @@ describe('App', () => {
       queryTopSellingRewards: vi.fn(() => of({ items: [], count: 0, total: 0 })),
       queryTopGames: vi.fn(() => of([])),
       queryGlobalRewards: vi.fn(() => of({ items: [], count: 0, total: 0 })),
+      scanGlobalRewards: vi.fn(() => of({ items: [], scanned: 0, total: 0, matches: 0 })),
       getAppName: vi.fn((appid: number) => of(`Game ${appid}`)),
+      getAppNames: vi.fn((appids: number[]) => of(appids.map((appid) => ({ appid, name: `Game ${appid}` })))),
     };
 
     TestBed.configureTestingModule({
@@ -107,6 +111,34 @@ describe('App', () => {
     expect(component.filtered()).toEqual([first, second]);
   });
 
+  it('renders the top view before app names finish hydrating', () => {
+    const name = new Subject<string>();
+    const item = reward({ appid: 1263950, defid: 78792, title: 'Birthday' });
+    service.queryTopSellingRewards.mockReturnValue(of({
+      items: [item],
+      count: 1,
+      total: 151706,
+    }));
+    service.queryTopGames.mockReturnValue(of([{ appid: 1263950, name: '', count: 17 }]));
+    service.getAppName.mockReturnValue(name.asObservable());
+
+    const fixture = TestBed.createComponent(App);
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    expect(component.loading()).toBe(false);
+    expect(component.items()).toEqual([item]);
+    expect(component.topGames()).toEqual([{ appid: 1263950, name: '', count: 17 }]);
+    expect(component.topGameLabel(component.topGames()[0])).toBe('App 1263950');
+    expect(service.getAppName).toHaveBeenCalledWith(1263950);
+
+    name.next('The Debut Collection');
+    name.complete();
+
+    expect(component.topGameLabel(component.topGames()[0])).toBe('The Debut Collection');
+    expect(component.appLabel(1263950)).toBe('The Debut Collection');
+  });
+
   it('resolves app names for loaded rewards outside the top-game chips', () => {
     const item = reward({ appid: 321360, defid: 10, title: 'Primal Reward' });
     service.queryTopSellingRewards.mockReturnValue(of({
@@ -155,6 +187,110 @@ describe('App', () => {
     expect(component.activeSuggestionIndex()).toBe(-1);
   });
 
+  it('scans the full global catalog for item keywords when requested', () => {
+    const scan = new Subject<{
+      items: RewardDefinition[];
+      scanned: number;
+      total: number;
+      matches: number;
+    }>();
+    const item = reward({ appid: 637310, defid: 103182, title: 'Cat Cam talking' });
+    service.scanGlobalRewards.mockReturnValue(scan.asObservable());
+
+    const fixture = TestBed.createComponent(App);
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    component.onQueryInput('cat');
+    expect(service.scanGlobalRewards).not.toHaveBeenCalled();
+
+    component.loadGlobalRewards();
+
+    expect(service.scanGlobalRewards).toHaveBeenCalledWith('cat', {
+      getKnownAppName: expect.any(Function),
+      onProgress: expect.any(Function),
+    });
+    expect(component.mode()).toBe('global');
+    expect(component.loading()).toBe(true);
+
+    const options = service.scanGlobalRewards.mock.calls[0][1];
+    options.onProgress({ scanned: 1000, total: 151706, matches: 1 });
+    expect(component.scanProgress()).toEqual({ done: 1000, total: 151706 });
+
+    scan.next({ items: [item], scanned: 1000, total: 151706, matches: 1 });
+    expect(component.items()).toEqual([item]);
+    expect(component.filtered()).toEqual([item]);
+    expect(service.getAppName).toHaveBeenCalledWith(637310);
+    expect(component.appLabel(637310)).toBe('Game 637310');
+
+    scan.complete();
+    expect(component.loading()).toBe(false);
+  });
+
+  it('cancels a stale global keyword scan when a new one starts', () => {
+    let firstUnsubscribed = false;
+    const second = new Subject<{
+      items: RewardDefinition[];
+      scanned: number;
+      total: number;
+      matches: number;
+    }>();
+    const current = reward({ appid: 570, defid: 2, title: 'Dog Courier' });
+    service.scanGlobalRewards
+      .mockReturnValueOnce(new Observable(() => () => {
+        firstUnsubscribed = true;
+      }))
+      .mockReturnValueOnce(second.asObservable());
+
+    const fixture = TestBed.createComponent(App);
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    component.scanGlobalRewardsForQuery('cat');
+    component.scanGlobalRewardsForQuery('dog');
+
+    expect(firstUnsubscribed).toBe(true);
+    expect(service.scanGlobalRewards).toHaveBeenCalledTimes(2);
+
+    second.next({ items: [current], scanned: 2000, total: 151706, matches: 1 });
+    second.complete();
+
+    expect(component.items()).toEqual([current]);
+    expect(component.loading()).toBe(false);
+  });
+
+  it('stops an active global keyword scan and keeps current matches', () => {
+    let unsubscribed = false;
+    const item = reward({ appid: 637310, defid: 103182, title: 'Cat Cam talking' });
+    const scan = new Subject<{
+      items: RewardDefinition[];
+      scanned: number;
+      total: number;
+      matches: number;
+    }>();
+    service.scanGlobalRewards.mockReturnValue(new Observable((subscriber) => {
+      const sub = scan.subscribe(subscriber);
+      return () => {
+        unsubscribed = true;
+        sub.unsubscribe();
+      };
+    }));
+
+    const fixture = TestBed.createComponent(App);
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    component.scanGlobalRewardsForQuery('cat');
+    scan.next({ items: [item], scanned: 1000, total: 151706, matches: 1 });
+
+    component.stopSearch();
+
+    expect(unsubscribed).toBe(true);
+    expect(component.loading()).toBe(false);
+    expect(component.items()).toEqual([item]);
+    expect(component.scanProgress()).toEqual({ done: 1000, total: 151706 });
+  });
+
   it('filters by title, app metadata, ids, class label, and cost', () => {
     const fixture = TestBed.createComponent(App);
     const component = fixture.componentInstance;
@@ -168,6 +304,37 @@ describe('App', () => {
       component.query.set(query);
       expect(component.filtered()).toEqual([item]);
     }
+  });
+
+  it('paginates visible rows with an adjustable default page size', () => {
+    const fixture = TestBed.createComponent(App);
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+
+    const rewards = Array.from({ length: 15 }, (_, idx) =>
+      reward({ appid: 730, defid: idx + 1, title: `Reward ${idx + 1}` }),
+    );
+    component.items.set(rewards);
+
+    expect(component.pageSize()).toBe(10);
+    expect(component.totalPages()).toBe(2);
+    expect(component.visibleRows()).toEqual(rewards.slice(0, 10));
+    expect(component.pageStartIndex()).toBe(0);
+    expect(component.pageEndIndex()).toBe(10);
+
+    component.nextPage();
+
+    expect(component.currentPage()).toBe(2);
+    expect(component.visibleRows()).toEqual(rewards.slice(10, 15));
+    expect(component.pageStartIndex()).toBe(10);
+    expect(component.pageEndIndex()).toBe(15);
+
+    component.onPageSizeInput(25);
+
+    expect(component.pageSize()).toBe(25);
+    expect(component.currentPage()).toBe(1);
+    expect(component.totalPages()).toBe(1);
+    expect(component.visibleRows()).toEqual(rewards);
   });
 
   it('hides placeholder class chips from the category filters', () => {
@@ -346,6 +513,40 @@ describe('App', () => {
 
     component.toggleSoundMuted();
     expect(component.soundMuted()).toBe(false);
+  });
+
+  it('downloads original reward assets as blobs', async () => {
+    const fixture = TestBed.createComponent(App);
+    const component = fixture.componentInstance;
+    fixture.detectChanges();
+    const item = reward({ appid: 4130550, defid: 137212, title: 'Animated Frame' });
+    item.community_item_data = {
+      item_title: 'Animated Frame',
+      item_image_small: 'animated.png',
+      item_image_large: 'static.png',
+      animated: true,
+    };
+
+    const click = vi.spyOn(HTMLAnchorElement.prototype, 'click').mockImplementation(() => undefined);
+    const appendChild = vi.spyOn(document.body, 'appendChild');
+    const fetchMock = vi.fn(() => Promise.resolve({
+      ok: true,
+      blob: () => Promise.resolve(new Blob(['asset'])),
+    }));
+    vi.stubGlobal('fetch', fetchMock);
+    vi.spyOn(URL, 'createObjectURL').mockReturnValue('blob:asset');
+    vi.spyOn(URL, 'revokeObjectURL').mockImplementation(() => undefined);
+
+    await component.downloadAsset(item);
+
+    expect(fetchMock).toHaveBeenCalledWith('/steam-assets/4130550/animated.png');
+    expect(click).toHaveBeenCalled();
+    const anchor = appendChild.mock.calls.at(-1)?.[0] as HTMLAnchorElement;
+    expect(anchor.download).toBe('Animated-Frame-4130550-137212.apng');
+    expect(component.downloadingAsset()).toBeNull();
+
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 });
 

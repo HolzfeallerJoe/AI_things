@@ -26,14 +26,11 @@
 
     <aside class="masthead__sub">
       <p class="lede">
-        An itemised scan of Steam's points shop.
+        Search Steam Points Shop rewards by game or item keyword.
       </p>
       <p>
-        Pick a game by name or appid, or load Steam's global rewards index to search across
-        points-shop items without a curated game list.
-      </p>
-      <p class="mono-note">
-        SRC&nbsp;·&nbsp;ILoyaltyRewardsService/QueryRewardItems/v1
+        Pick a game by name or appid for a single-game fetch. Enter an item keyword and run
+        a full catalog scan when you want every matching reward Steam exposes.
       </p>
     </aside>
   </header>
@@ -107,27 +104,46 @@
         id="q"
         type="search"
         autocomplete="off"
-        placeholder='filter by item name — e.g. "cat", "wolf", "frame"…'
+          placeholder='type an item keyword — e.g. "cat", "wolf", "frame"…'
         name="q"
         [ngModel]="query()"
-        (ngModelChange)="query.set($event)">
-      <button type="button" class="btn btn--scan" [class.active]="mode() === 'global'" (click)="loadGlobalRewards()" [disabled]="loading()">
-        LOAD&nbsp;GLOBAL&nbsp;INDEX
-      </button>
+        (ngModelChange)="onQueryInput($event)">
+      @if (loading() && mode() === 'global') {
+        <button type="button" class="btn btn--scan active" (click)="stopSearch()">
+          STOP&nbsp;SCAN
+        </button>
+      } @else {
+        <button type="button" class="btn btn--scan" [class.active]="mode() === 'global'" (click)="loadGlobalRewards()">
+          {{ query().trim() ? 'SCAN FULL CATALOG' : 'LOAD GLOBAL SAMPLE' }}
+        </button>
+      }
       <span class="count">
-        {{ filtered().length }}<i>/</i>{{ items().length }}
+        @if (mode() === 'global' && query().trim()) {
+          {{ filtered().length }}<i>matches</i>
+        } @else {
+          {{ filtered().length }}<i>/</i>{{ items().length }}
+        }
       </span>
     </div>
 
-    <!-- Progress bar during global index load -->
+    <!-- Progress bar during global index scans -->
     @if (mode() === 'global' && scanProgress().total > 0) {
       <div class="progress">
         <div class="progress__bar">
           <span class="progress__fill" [style.width.%]="progressPercent()"></span>
         </div>
         <span class="progress__num">
-          {{ scanProgress().done }}<i>/</i>{{ scanProgress().total }}
-          @if (!loading()) { <em>· loaded</em> }
+          {{ scanProgress().done }}<i>/</i>{{ scanProgress().total }} scanned
+          @if (query().trim()) {
+            <em>· {{ items().length }} matched</em>
+            @if (!loading() && scanProgress().done < scanProgress().total) {
+              <em>· stopped</em>
+            } @else if (!loading()) {
+              <em>· scan complete</em>
+            }
+          } @else {
+            @if (!loading()) { <em>· sample loaded</em> }
+          }
         </span>
       </div>
     }
@@ -147,7 +163,7 @@
             class="chip chip--game"
             [class.active]="isTopGameActive(game.appid)"
             (click)="toggleApp(game.appid)">
-            {{ game.name }}
+            {{ topGameLabel(game) }}
           </button>
         }
         <button
@@ -180,6 +196,30 @@
         }
       </div>
     }
+
+    <nav class="pager" aria-label="Results pagination">
+      <div class="pager__summary">
+        <span>PAGE</span>
+        <b>{{ currentPage() }}</b>
+        <i>/</i>
+        <b>{{ totalPages() }}</b>
+        <em>{{ pageStartIndex() + (filtered().length ? 1 : 0) }}-{{ pageEndIndex() }} of {{ filtered().length }}</em>
+      </div>
+      <div class="pager__controls">
+        <button type="button" class="pager__btn" (click)="goToPage(1)" [disabled]="!hasPreviousPage()">FIRST</button>
+        <button type="button" class="pager__btn" (click)="previousPage()" [disabled]="!hasPreviousPage()">PREV</button>
+        <label class="pager__size">
+          <span>ROWS</span>
+          <select [ngModel]="pageSize()" (ngModelChange)="onPageSizeInput($event)" name="page-size">
+            @for (size of pageSizeOptions; track size) {
+              <option [ngValue]="size">{{ size }}</option>
+            }
+          </select>
+        </label>
+        <button type="button" class="pager__btn" (click)="nextPage()" [disabled]="!hasNextPage()">NEXT</button>
+        <button type="button" class="pager__btn" (click)="goToPage(totalPages())" [disabled]="!hasNextPage()">LAST</button>
+      </div>
+    </nav>
   </section>
 
   <section class="results-stage" [style.minHeight.px]="resultsMinHeight()">
@@ -187,7 +227,11 @@
       <div class="status">
         <span class="blip"></span>
         @if (mode() === 'global') {
-          <span>loading up to {{ globalRewardLimit }} rewards from Steam's global points-shop index…</span>
+          @if (query().trim()) {
+            <span>scanning every Steam points-shop reward for <b>{{ query().trim() }}</b>…</span>
+          } @else {
+            <span>loading a {{ globalRewardLimit }} reward sample from Steam's points-shop catalog…</span>
+          }
         } @else if (mode() === 'top') {
           <span>loading the {{ topSellingLimit }} most sold points-shop rewards…</span>
         } @else {
@@ -196,7 +240,7 @@
       </div>
     } @else if (otherGamePrompt()) {
       <div class="status">
-        search for another game by name or appid in the <b>GAME</b> field, then press <b>FETCH</b>.
+        enter a game name or appid in the <b>GAME</b> field, then press <b>FETCH</b>.
       </div>
     } @else if (error()) {
       <div class="status status--err">
@@ -205,9 +249,13 @@
       </div>
     } @else if (filtered().length === 0 && !loading()) {
       <div class="status">
-        no entries match.
-        @if (mode() === 'single') { try a different game or click <b>LOAD GLOBAL INDEX</b>. }
-        @if (mode() === 'top') { click <b>LOAD GLOBAL INDEX</b> to search more rewards. }
+        @if (mode() === 'global' && query().trim() && scanProgress().done > 0) {
+          no entries match after scanning {{ scanProgress().done }} rewards.
+        } @else {
+          no entries match.
+        }
+        @if (mode() === 'single') { try a different game or enter an item keyword and run a full catalog scan. }
+        @if (mode() === 'top') { enter an item keyword and run a full catalog scan to search beyond the top rewards. }
       </div>
     }
 
@@ -216,15 +264,15 @@
         <div class="manifest__head">
           <span>#</span>
           <span>thumb</span>
-          <span>title</span>
+          <span>reward</span>
           <span>class</span>
           <span class="r">cost</span>
-          <span class="c">links</span>
+          <span class="c">actions</span>
         </div>
 
         @for (it of visibleRows(); track it.appid + '-' + it.defid; let i = $index) {
           <div class="row">
-            <span class="i">{{ pad(i + 1) }}</span>
+            <span class="i">{{ pad(pageStartIndex() + i + 1) }}</span>
             <span class="t">
               @if (thumbUrl(it); as u) {
                 <app-static-thumbnail [src]="u" alt="" />
@@ -259,7 +307,14 @@
             <span class="cost">{{ it.point_cost }}<em>p</em></span>
             <span class="acts c">
               @if (assetHref(it); as u) {
-                <a [href]="u" target="_blank" rel="noopener" title="Open raw asset">↓</a>
+                <button
+                  type="button"
+                  [disabled]="isDownloadingAsset(it)"
+                  [title]="isDownloadingAsset(it) ? 'Downloading asset' : 'Download original asset'"
+                  (click)="downloadAsset(it, $event)">
+                  {{ isDownloadingAsset(it) ? '…' : '↓' }}
+                </button>
+                <a [href]="u" target="_blank" rel="noopener" title="Open raw asset">⤴</a>
               } @else {
                 <span class="acts__none">—</span>
               }
@@ -268,12 +323,6 @@
           </div>
         }
 
-        @if (truncated()) {
-          <div class="overflow">
-            rendering first {{ visibleRows().length }} of {{ filtered().length }} matches —
-            narrow your <span class="kbd">/</span> filter to see the rest.
-          </div>
-        }
       </section>
     }
   </section>

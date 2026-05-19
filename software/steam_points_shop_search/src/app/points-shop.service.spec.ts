@@ -86,6 +86,146 @@ describe('PointsShopService', () => {
     expect(received).toEqual({ items: [item], count: 1, total: 151706 });
   });
 
+  it('scans all global reward pages with cursor pagination and deduplicates matches', () => {
+    const cat = reward({ appid: 637310, defid: 103182, title: 'Cat Cam talking' });
+    const duplicateCat = { ...cat };
+    const otherCat = reward({ appid: 2723430, defid: 1892069, title: 'Dreamy Cats' });
+    const pages: unknown[] = [];
+    let completed = false;
+
+    service.scanGlobalRewards('cat', { pageDelayMs: 0 }).subscribe({
+      next: (page) => pages.push(page),
+      complete: () => {
+        completed = true;
+      },
+    });
+
+    const firstReq = http.expectOne((request) =>
+      request.url.includes('/steam-api/ILoyaltyRewardsService/QueryRewardItems/v1/'),
+    );
+    expect(firstReq.request.urlWithParams).toContain('%22count%22%3A1000');
+    firstReq.flush({
+      response: {
+        definitions: [
+          reward({ appid: 321360, defid: 1, title: 'Darkest Jungle' }),
+          cat,
+        ],
+        count: 2,
+        total_count: 4,
+        next_cursor: 'next-page',
+      },
+    });
+
+    const secondReq = http.expectOne((request) =>
+      request.url.includes('/steam-api/ILoyaltyRewardsService/QueryRewardItems/v1/')
+      && request.urlWithParams.includes('%22cursor%22%3A%22next-page%22'),
+    );
+    secondReq.flush({
+      response: {
+        definitions: [duplicateCat, otherCat],
+        count: 2,
+        total_count: 4,
+      },
+    });
+
+    expect(pages).toEqual([
+      {
+        items: [cat],
+        scanned: 2,
+        total: 4,
+        matches: 1,
+      },
+      {
+        items: [cat, otherCat],
+        scanned: 4,
+        total: 4,
+        matches: 2,
+      },
+    ]);
+    expect(completed).toBe(true);
+  });
+
+  it('resolves app names with per-app requests instead of Steam comma batching', () => {
+    let received: unknown;
+
+    service.getAppNames([570, 730]).subscribe((apps) => {
+      received = apps;
+    });
+
+    http.expectNone('/steam-store/api/appdetails?appids=570,730&filters=basic');
+    http.expectOne('/steam-store/api/appdetails?appids=570&filters=basic').flush({
+      '570': { success: true, data: { name: 'Dota 2' } },
+    });
+    http.expectOne('/steam-store/api/appdetails?appids=730&filters=basic').flush({
+      '730': { success: true, data: { name: 'Counter-Strike 2' } },
+    });
+
+    expect(received).toEqual([
+      { appid: 570, name: 'Dota 2' },
+      { appid: 730, name: 'Counter-Strike 2' },
+    ]);
+  });
+
+  it('deduplicates app name requests and falls back to Steam Community names', () => {
+    let received: unknown;
+
+    service.getAppNames([1263950, 1263950]).subscribe((apps) => {
+      received = apps;
+    });
+
+    http.expectOne('/steam-store/api/appdetails?appids=1263950&filters=basic').flush({
+      '1263950': { success: false },
+    });
+    http.expectOne('/steam-community/app/1263950').flush(`
+      <html>
+        <head><title>Steam Community :: The Debut Collection</title></head>
+        <body><div class="apphub_AppName">The Debut Collection</div></body>
+      </html>
+    `);
+
+    expect(received).toEqual([{ appid: 1263950, name: 'The Debut Collection' }]);
+  });
+
+  it('shares and caches app name requests', () => {
+    const received: string[] = [];
+
+    service.getAppName(730).subscribe((name) => received.push(name));
+    service.getAppName(730).subscribe((name) => received.push(name));
+
+    http.expectOne('/steam-store/api/appdetails?appids=730&filters=basic').flush({
+      '730': { success: true, data: { name: 'Counter-Strike 2' } },
+    });
+
+    service.getAppName(730).subscribe((name) => received.push(name));
+    http.expectNone('/steam-store/api/appdetails?appids=730&filters=basic');
+
+    expect(received).toEqual(['Counter-Strike 2', 'Counter-Strike 2', 'Counter-Strike 2']);
+  });
+
+  it('matches global scan rewards by known app name when available', () => {
+    const item = reward({ appid: 730, defid: 1, title: 'Tactical Frame' });
+    let received: unknown;
+
+    service.scanGlobalRewards('counter-strike', {
+      getKnownAppName: (appid) => (appid === 730 ? 'Counter-Strike 2' : undefined),
+      pageDelayMs: 0,
+    }).subscribe((page) => {
+      received = page;
+    });
+
+    const req = http.expectOne((request) =>
+      request.url.includes('/steam-api/ILoyaltyRewardsService/QueryRewardItems/v1/'),
+    );
+    req.flush({ response: { definitions: [item], count: 1, total_count: 1 } });
+
+    expect(received).toEqual({
+      items: [item],
+      scanned: 1,
+      total: 1,
+      matches: 1,
+    });
+  });
+
   it('requests top-selling reward ordering', () => {
     let received: unknown;
 
@@ -104,7 +244,7 @@ describe('PointsShopService', () => {
     expect(received).toEqual({ items: [], count: 0, total: 151706 });
   });
 
-  it('derives top games from top-selling rewards and resolves app names', () => {
+  it('derives top games from top-selling rewards without blocking on app names', () => {
     let received: unknown;
 
     service.queryTopGames(2, 5).subscribe((games) => {
@@ -129,16 +269,11 @@ describe('PointsShopService', () => {
       },
     });
 
-    http.expectOne('/steam-store/api/appdetails?appids=570&filters=basic').flush({
-      '570': { success: true, data: { name: 'Dota 2' } },
-    });
-    http.expectOne('/steam-store/api/appdetails?appids=730&filters=basic').flush({
-      '730': { success: true, data: { name: 'Counter-Strike 2' } },
-    });
+    http.expectNone((request) => request.url.includes('/steam-store/api/appdetails'));
 
     expect(received).toEqual([
-      { appid: 730, name: 'Counter-Strike 2', count: 3 },
-      { appid: 570, name: 'Dota 2', count: 2 },
+      { appid: 730, name: '', count: 3 },
+      { appid: 570, name: '', count: 2 },
     ]);
   });
 
