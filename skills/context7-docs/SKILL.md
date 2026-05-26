@@ -47,6 +47,12 @@ If not cached or version changed:
 
 ### Step 4: Update Cache
 
+**If you just created `CONTEXT7_DOCS.md` (it did not exist before):** the cache is local and should not be committed. If the project is a git repo, add it to the repo-local git exclude so it's ignored without touching the shared `.gitignore`:
+
+- Append `CONTEXT7_DOCS.md` to `.git/info/exclude` (create/edit that file), but only if it isn't already listed there or in `.gitignore`.
+- If there's no `.git` directory, skip this silently — nothing to exclude.
+- If the file exists but can't be written, **report it to the user** (so they can exclude it manually) and **continue with the rest** of the workflow anyway — it's a best-effort convenience, not a hard requirement.
+
 Append to `CONTEXT7_DOCS.md`:
 
 ```markdown
