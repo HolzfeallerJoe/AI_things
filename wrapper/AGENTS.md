@@ -1,1 +1,1 @@
-If some packages from node are not installed please install them via npm install
+If some packages are missing that are needed to run the software install them.
