@@ -139,6 +139,9 @@ Use `retryWithBackoff()` helper or add delays between requests.
 
 ## Learnings
 
+### Not installed dependencies
+If some packages are missing that are needed to run the software install them via the projects package manager.
+
 ### Type Exports in ESM
 Same as GitHub/Jira wrappers - interfaces must use `export type { ... }` in index.ts.
 

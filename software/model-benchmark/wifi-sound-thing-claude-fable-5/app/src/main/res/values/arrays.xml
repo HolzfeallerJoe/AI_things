@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Must stay in the same order as Prefs.BITRATE_OPTIONS -->
+    <string-array name="bitrate_labels">
+        <item>Data saver (96 kbps)</item>
+        <item>Balanced (160 kbps)</item>
+        <item>High (256 kbps)</item>
+    </string-array>
+
+    <!-- Must stay in the same order as Prefs.JITTER_OPTIONS -->
+    <string-array name="latency_labels">
+        <item>Lowest delay (~64 ms buffer)</item>
+        <item>Balanced (~107 ms buffer)</item>
+        <item>Most stable (~213 ms buffer)</item>
+    </string-array>
+</resources>

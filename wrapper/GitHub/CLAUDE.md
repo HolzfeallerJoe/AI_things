@@ -140,6 +140,9 @@ The resource may not exist, or your token may not have access to private resourc
 
 ## Learnings
 
+### Not installed dependencies
+If some packages are missing that are needed to run the software install them via the projects package manager.
+
 ### Type Exports in ESM
 When exporting TypeScript interfaces/types from index.ts, use `export type { ... }` instead of regular `export { ... }`. This is required because interfaces don't exist at runtime in JavaScript - they're compile-time only constructs. Mixing them with value exports causes runtime errors like:
 ```

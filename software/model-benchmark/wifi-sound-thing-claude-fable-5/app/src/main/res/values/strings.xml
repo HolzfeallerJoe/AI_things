@@ -1,0 +1,67 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WiFi Sound Thing</string>
+
+    <!-- Main screen -->
+    <string name="main_tagline">Share one phone\'s sound with everyone\'s headphones over Wi-Fi.</string>
+    <string name="main_host_button">Host</string>
+    <string name="main_host_subtitle">This phone plays the video or music and sends its sound to others</string>
+    <string name="main_client_button">Client</string>
+    <string name="main_client_subtitle">This phone listens to a host through its own headphones</string>
+    <string name="main_last_role_host">Last time this phone was the Host</string>
+    <string name="main_last_role_client">Last time this phone was a Client</string>
+
+    <!-- Host screen -->
+    <string name="host_title">Host</string>
+    <string name="host_status_idle">Not broadcasting</string>
+    <string name="host_status_running">Broadcasting</string>
+    <string name="host_button_start">Start broadcasting</string>
+    <string name="host_button_stop">Stop broadcasting</string>
+    <string name="host_address_label">This phone\'s address</string>
+    <string name="host_address_format">%1$s:%2$d</string>
+    <string name="host_address_unknown">No Wi-Fi address found — is Wi-Fi on?</string>
+    <string name="host_stat_peers">Listeners</string>
+    <string name="host_stat_uptime">Uptime</string>
+    <string name="host_stat_sent">Data sent</string>
+    <string name="host_stat_bitrate">Sending rate</string>
+    <string name="host_bitrate_label">Audio quality</string>
+    <string name="host_capture_note">Works with most apps (e.g. Spotify, YouTube, Crunchyroll, games, browsers). Some apps — most video apps with strict copy protection such as Netflix — block audio capture: they will simply be silent for listeners. The screen-sharing permission is only used to capture sound; the screen itself is never recorded or sent.</string>
+    <string name="host_error_consent_denied">To broadcast, please allow the screen recording request — it is only used to capture the sound.</string>
+    <string name="host_error_mic_denied">The microphone permission is required by Android to capture audio. Nothing is recorded from the actual microphone.</string>
+    <string name="host_error_no_permission">Audio capture permission was not granted, so broadcasting could not start.</string>
+    <string name="host_error_projection_stopped">Android ended the audio capture session, so broadcasting was stopped.</string>
+    <string name="host_error_port">Could not open network port %1$d (%2$s). Is another broadcast already running?</string>
+    <string name="host_channel_name">Broadcast status</string>
+    <string name="host_notification_title">Broadcasting audio</string>
+    <string name="host_notification_starting">Starting…</string>
+    <string name="host_notification_status">%1$d listener(s) · %2$s · %3$s sent</string>
+    <string name="action_stop">Stop</string>
+
+    <!-- Client screen -->
+    <string name="client_title">Client</string>
+    <string name="client_discovery_header">Hosts on your network</string>
+    <string name="client_discovery_searching">Searching for hosts… make sure the host pressed Start.</string>
+    <string name="client_discovery_tap">Tap a host to connect.</string>
+    <string name="client_manual_header">Or connect by address</string>
+    <string name="client_manual_hint">Host address, e.g. 192.168.1.23</string>
+    <string name="client_manual_connect">Connect</string>
+    <string name="client_latency_label">Buffering</string>
+    <string name="client_error_bad_address">That does not look like a valid address. Use the address shown on the host\'s screen, e.g. 192.168.1.23</string>
+    <string name="client_state_stopped">Not connected</string>
+    <string name="client_state_connecting">Connecting to %1$s…</string>
+    <string name="client_state_buffering">Connected — buffering…</string>
+    <string name="client_state_playing">Playing from %1$s</string>
+    <string name="client_state_reconnecting">Connection lost — reconnecting…</string>
+    <string name="client_state_failed">Can\'t reach the host — still trying…</string>
+    <string name="client_stat_bitrate">Receiving rate</string>
+    <string name="client_stat_buffer">Buffer</string>
+    <string name="client_stat_buffer_format">%1$d / %2$d packets</string>
+    <string name="client_stat_loss">Packet loss</string>
+    <string name="client_stat_received">Data received</string>
+    <string name="client_channel_name">Playback status</string>
+    <string name="client_notification_title">WiFi Sound Thing</string>
+    <string name="action_disconnect">Disconnect</string>
+
+    <!-- Discovery -->
+    <string name="discovery_service_name">WiFi Sound Thing (%1$s)</string>
+</resources>

@@ -108,6 +108,9 @@ Page bodies must be storage-format XHTML. Build them with `markdownToStorage()` 
 
 ## Learnings
 
+### Not installed dependencies
+If some packages are missing that are needed to run the software install them via the projects package manager.
+
 ### Type Exports in ESM
 Same as the GitHub/Jira/Figma wrappers - interfaces must use `export type { ... }` in index.ts (or be re-exported via `export * from './types.js'`). Interfaces are compile-time only, so mixing them into value exports causes runtime "does not provide an export named ..." errors.
 

@@ -97,3 +97,8 @@ Verify `.env` has correct values:
 - `JIRA_DOMAIN` - e.g., `ascora.atlassian.net`
 - `JIRA_EMAIL` - Your Atlassian account email
 - `JIRA_API_TOKEN` - Token from https://id.atlassian.com/manage-profile/security/api-tokens
+
+## Learnings
+
+### Not installed dependencies
+If some packages are missing that are needed to run the software install them via the projects package manager.
