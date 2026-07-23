@@ -1,0 +1,32 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Original design: a speaker sending waves to two listeners (two dots). -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <!-- Speaker body and cone -->
+    <path
+        android:pathData="M32,47 h8 l10,-8 v30 l-10,-8 h-8 z"
+        android:fillColor="#FFFFFFFF" />
+    <!-- Sound waves -->
+    <path
+        android:pathData="M57,47 a9,9 0 0 1 0,14"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <path
+        android:pathData="M63,42 a15,15 0 0 1 0,24"
+        android:strokeColor="#FFFFFFFF"
+        android:strokeWidth="3.5"
+        android:strokeLineCap="round"
+        android:fillColor="#00000000" />
+    <!-- Two listeners -->
+    <path
+        android:pathData="M74,46m-3.5,0a3.5,3.5 0 1,1 7,0a3.5,3.5 0 1,1 -7,0"
+        android:fillColor="#FFFFFFFF" />
+    <path
+        android:pathData="M74,62m-3.5,0a3.5,3.5 0 1,1 7,0a3.5,3.5 0 1,1 -7,0"
+        android:fillColor="#FFFFFFFF" />
+</vector>

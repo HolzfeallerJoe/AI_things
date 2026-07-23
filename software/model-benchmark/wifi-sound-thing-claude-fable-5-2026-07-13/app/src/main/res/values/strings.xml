@@ -1,0 +1,80 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">WiFi Sound Thing</string>
+    <string name="main_tagline">Share one phone\'s audio with everyone\'s headphones over Wi-Fi.</string>
+    <string name="main_choose_role">What should this phone do?</string>
+
+    <string name="role_host_title">Host</string>
+    <string name="role_host_desc">Share the audio this phone is playing (movies, music, games) with other phones on the same Wi-Fi.</string>
+    <string name="role_client_title">Listen</string>
+    <string name="role_client_desc">Receive audio from a host phone and play it through this phone\'s speaker or headphones.</string>
+
+    <!-- Host screen -->
+    <string name="host_title">Host</string>
+    <string name="host_device_name_hint">Name shown to listeners</string>
+    <string name="host_codec_label">Audio format</string>
+    <string name="host_codec_auto">Compressed (Opus) — recommended, uses much less Wi-Fi bandwidth</string>
+    <string name="host_codec_pcm">Uncompressed (PCM) — try this if listeners hear no sound or bad sound</string>
+    <string name="host_start">Start broadcasting</string>
+    <string name="host_stop">Stop</string>
+    <string name="host_status_idle">Not broadcasting</string>
+    <string name="host_status_broadcasting">Broadcasting</string>
+    <string name="host_address_label">Address</string>
+    <string name="host_address_unknown">Unavailable — is Wi-Fi on?</string>
+    <string name="host_uptime_label">Uptime</string>
+    <string name="host_clients_label">Listeners</string>
+    <string name="host_data_label">Data sent</string>
+    <string name="host_codec_value_label">Format</string>
+    <string name="host_level_label">Captured audio level</string>
+    <string name="host_silent_hint">No audio detected. Play something on this phone — if it stays silent, the app you are playing from probably blocks audio capture (Netflix and some others do; see the README for details).</string>
+    <string name="host_manual_hint">Listeners who don\'t see this host automatically can type the address above into their app.</string>
+
+    <!-- Client screen -->
+    <string name="client_title">Listen</string>
+    <string name="client_hosts_header">Hosts on your network</string>
+    <string name="client_scanning">Searching for hosts… make sure the host has pressed \"Start broadcasting\" and both phones use the same Wi-Fi.</string>
+    <string name="client_manual_header">Or connect by address</string>
+    <string name="client_manual_hint">Host address (e.g. 192.168.1.23)</string>
+    <string name="client_connect">Connect</string>
+    <string name="client_disconnect">Disconnect</string>
+    <string name="client_buffer_label">Buffering</string>
+    <string name="client_phase_idle">Not connected</string>
+    <string name="client_phase_connecting">Connecting…</string>
+    <string name="client_phase_connected">Connected — playing audio</string>
+    <string name="client_phase_reconnecting">Connection lost — reconnecting…</string>
+    <string name="client_host_label">Host</string>
+    <string name="client_codec_label">Format</string>
+    <string name="client_loss_label">Packet loss</string>
+    <string name="client_buffer_value_label">Buffer</string>
+    <string name="client_bitrate_label">Bitrate</string>
+    <string name="client_buffer_ms">%1$d ms</string>
+    <string name="client_kbps">%1$d kbit/s</string>
+
+    <!-- Errors (FR-12: plain language) -->
+    <string name="error_projection_denied">Broadcasting needs the screen/audio capture permission. Press Start and choose \"Start now\" in the system dialog.</string>
+    <string name="error_record_audio_denied">Broadcasting needs the microphone permission (Android uses it for capturing playback audio). Please allow it and try again.</string>
+    <string name="error_bad_address">That doesn\'t look like a valid address. Use the address shown on the host screen, e.g. 192.168.1.23 or 192.168.1.23:53705.</string>
+
+    <!-- Notifications -->
+    <string name="notif_channel_host">Broadcasting</string>
+    <string name="notif_host_title">WiFi Sound Thing — Host</string>
+    <string name="notif_host_starting">Starting broadcast…</string>
+    <plurals name="notif_host_listeners">
+        <item quantity="one">Broadcasting audio • %d listener</item>
+        <item quantity="other">Broadcasting audio • %d listeners</item>
+    </plurals>
+    <string name="action_stop">Stop</string>
+
+    <string name="notif_channel_client">Listening</string>
+    <string name="notif_client_title">WiFi Sound Thing — Listening</string>
+    <string name="notif_client_connecting">Connecting to %1$s…</string>
+    <string name="notif_client_connected">Listening to %1$s</string>
+    <string name="notif_client_reconnecting">Connection lost — reconnecting…</string>
+    <string name="action_disconnect">Disconnect</string>
+
+    <string-array name="buffer_presets">
+        <item>Low delay (may stutter on busy Wi-Fi)</item>
+        <item>Normal (recommended)</item>
+        <item>Safe (more delay, fewer dropouts)</item>
+    </string-array>
+</resources>
