@@ -1,0 +1,199 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <title>Now Playing</title>
+  <link rel="stylesheet" href="/static/vendor/bootstrap.min.css" />
+  <style>
+    /* ---- Tweak the look here -------------------------------------------- */
+    :root {
+      --card-width: 380px;                  /* fixed card width */
+      --card-height: 104px;                 /* fixed card height */
+      --cover-size: 72px;                   /* album art square */
+
+      --card-bg: rgba(18, 18, 22, 0.88);
+      --card-border: rgba(255, 255, 255, 0.10);
+      --accent: #1db954;                    /* Spotify-ish green eyebrow */
+      --title-color: #ffffff;
+      --artist-color: rgba(255, 255, 255, 0.70);
+
+      --marquee-speed: 15;                  /* px/second the title scrolls (lower = slower) */
+      --fade-ms: 400ms;
+    }
+    /* --------------------------------------------------------------------- */
+
+    /* Page is only as big as the card, transparent for OBS. */
+    html, body {
+      margin: 0;
+      padding: 0;
+      background: transparent;
+      width: fit-content;
+      height: fit-content;
+    }
+
+    #card {
+      width: var(--card-width);
+      height: var(--card-height);
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 14px;
+      box-shadow: 0 10px 30px rgba(0, 0, 0, 0.45);
+      overflow: hidden;
+      opacity: 0;
+      transition: opacity var(--fade-ms) ease;
+    }
+    #card.visible { opacity: 1; }
+
+    #card .cover {
+      width: var(--cover-size);
+      height: var(--cover-size);
+      flex: 0 0 auto;
+      border-radius: 8px;
+      object-fit: cover;
+      background: rgba(255, 255, 255, 0.06);
+    }
+    #card .cover.empty { display: none; }
+
+    /* Text column must be allowed to shrink so overflow can be detected. */
+    #card .text-col {
+      flex: 1 1 auto;
+      min-width: 0;
+    }
+
+    #card .eyebrow {
+      color: var(--accent);
+      font-size: 12px;
+      font-weight: 700;
+      letter-spacing: 0.10em;
+      text-transform: uppercase;
+    }
+    #card .title { color: var(--title-color); font-size: 22px; font-weight: 700; line-height: 1.2; }
+    #card .artist { color: var(--artist-color); font-size: 16px; line-height: 1.3; }
+
+    /* One-line clip window; the inner span holds the full text. */
+    .scroller { overflow: hidden; }
+    .scroller .inner { display: inline-block; white-space: nowrap; will-change: transform; }
+
+    /* Marquee: hold, glide left to reveal the end, hold, glide back. */
+    .scroller.scroll .inner { animation: marquee var(--dur) ease-in-out infinite; }
+    @keyframes marquee {
+      0%, 12%   { transform: translateX(0); }
+      48%, 56%  { transform: translateX(var(--shift)); }
+      92%, 100% { transform: translateX(0); }
+    }
+
+    /* Truncation fallback (used when marquee is disabled). */
+    .scroller.truncate .inner {
+      display: block;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-width: 100%;
+    }
+  </style>
+</head>
+<body>
+  <div id="card" class="card">
+    <div class="card-body py-3 px-4 d-flex align-items-center gap-3">
+      <img id="cover" class="cover empty" alt="" />
+      <div class="text-col">
+        <div class="eyebrow mb-1"><span id="eyebrow-text">♪ Now Playing</span></div>
+        <div class="title scroller" id="title-scroller"><span class="inner" id="title"></span></div>
+        <div class="artist scroller" id="artist-scroller"><span class="inner" id="artist"></span></div>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // ---- Config ---------------------------------------------------------
+    const POLL_MS = 2000;          // how often to check Spotify
+    const SHOW_PODCASTS = true;    // set false to hide podcast episodes
+    const EYEBROW = "♪ Now Playing";
+    const ENABLE_MARQUEE = true;   // true: scroll long titles; false: truncate with "…"
+    // ---------------------------------------------------------------------
+
+    const card = document.getElementById("card");
+    const eyebrowEl = document.getElementById("eyebrow-text");
+    const titleScroller = document.getElementById("title-scroller");
+    const artistScroller = document.getElementById("artist-scroller");
+    const titleEl = document.getElementById("title");
+    const artistEl = document.getElementById("artist");
+    const coverEl = document.getElementById("cover");
+    eyebrowEl.textContent = EYEBROW;
+
+    let lastKey = null; // avoid re-fading when the track hasn't changed
+
+    // Toggle the marquee/truncation for one line based on whether it overflows.
+    function fitLine(scroller, inner) {
+      scroller.classList.remove("scroll", "truncate");
+      inner.style.removeProperty("--shift");
+      inner.style.removeProperty("--dur");
+
+      const overflow = inner.scrollWidth - scroller.clientWidth;
+      if (overflow <= 2) return; // fits, leave it static
+
+      if (!ENABLE_MARQUEE) {
+        scroller.classList.add("truncate");
+        return;
+      }
+      const speed = parseFloat(
+        getComputedStyle(document.documentElement).getPropertyValue("--marquee-speed")
+      ) || 45;
+      // Round-trip travel is 2x the overflow; add ~2.4s for the four hold pauses.
+      const dur = (overflow * 2) / speed + 2.4;
+      inner.style.setProperty("--shift", (-overflow) + "px");
+      inner.style.setProperty("--dur", dur.toFixed(2) + "s");
+      scroller.classList.add("scroll");
+    }
+
+    function render(data) {
+      const hide = !data || !data.playing
+        || (!data.is_track && !SHOW_PODCASTS)
+        || !(data.title || data.artist);
+
+      if (hide) {
+        if (lastKey !== null) { card.classList.remove("visible"); lastKey = null; }
+        return;
+      }
+
+      const key = data.title + " " + data.artist;
+      if (key === lastKey) return; // unchanged, leave the card as-is
+      lastKey = key;
+
+      card.classList.remove("visible");
+      setTimeout(() => {
+        titleEl.textContent = data.title || "";
+        artistEl.textContent = data.artist || "";
+        artistScroller.style.display = data.artist ? "" : "none";
+
+        if (data.cover) {
+          coverEl.src = data.cover;
+          coverEl.classList.remove("empty");
+        } else {
+          coverEl.removeAttribute("src");
+          coverEl.classList.add("empty");
+        }
+
+        // Reading scrollWidth in fitLine() forces a synchronous layout, so we
+        // can measure right away without waiting for a frame.
+        fitLine(titleScroller, titleEl);
+        if (data.artist) fitLine(artistScroller, artistEl);
+
+        card.classList.add("visible");
+      }, 200);
+    }
+
+    async function poll() {
+      try {
+        const resp = await fetch("/nowplaying", { cache: "no-store" });
+        if (!resp.ok) { render(null); return; }
+        render(await resp.json());
+      } catch (_e) {
+        // Server not reachable yet; keep whatever is shown.
+      }
+    }
+
+    poll();
+    setInterval(poll, POLL_MS);
+  </script>
+</body>
+</html>
