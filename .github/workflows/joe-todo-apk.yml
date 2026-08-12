@@ -1,0 +1,80 @@
+# Debug-APK fuer software/joe-todo.
+#
+# Dieses Repo enthaelt viele unabhaengige Projekte, die nach und nach eigene
+# Workflows bekommen. Darum haengt hier alles an einem paths-Filter: der Job
+# laeuft nur, wenn wirklich an joe-todo (oder an diesem Workflow) etwas
+# geaendert wurde. Siehe .github/workflows/README.md.
+name: joe-todo · Debug-APK
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - 'software/joe-todo/**'
+      - '.github/workflows/joe-todo-apk.yml'
+  pull_request:
+    paths:
+      - 'software/joe-todo/**'
+      - '.github/workflows/joe-todo-apk.yml'
+  # Manuell ausloesbar, falls man das APK ohne Aenderung braucht.
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+# Bei mehreren Pushes hintereinander zaehlt nur der letzte.
+concurrency:
+  group: joe-todo-apk-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Analyse, Tests, Debug-APK
+    runs-on: ubuntu-latest
+
+    defaults:
+      run:
+        working-directory: software/joe-todo/app
+
+    steps:
+      - uses: actions/checkout@v4
+
+      # AGP 8.11 und Gradle 8.14 laufen auf JDK 17; app/build.gradle.kts
+      # kompiliert ohnehin gegen 17.
+      - name: JDK 17 einrichten
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+          cache: gradle
+
+      # Feste Version statt 'stable', damit CI und Arbeitsplatz dasselbe
+      # bauen. Beim Hochziehen hier und lokal gemeinsam anheben.
+      - name: Flutter einrichten
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: 3.38.4
+          channel: stable
+          cache: true
+
+      - name: Abhaengigkeiten holen
+        run: flutter pub get
+
+      - name: Analyse
+        run: flutter analyze
+
+      - name: Unit-Tests
+        run: flutter test
+
+      # Debug statt Release: fuer Release fehlt ein eigener Signing-Key, der
+      # Standard waere der Debug-Keystore. Entspricht build-debug-apk.ps1.
+      - name: Debug-APK bauen
+        run: flutter build apk --debug
+
+      - name: APK hochladen
+        uses: actions/upload-artifact@v4
+        with:
+          name: joe-todo-debug-apk-${{ github.sha }}
+          path: software/joe-todo/app/build/app/outputs/flutter-apk/app-debug.apk
+          if-no-files-found: error
+          retention-days: 14
