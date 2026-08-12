@@ -71,13 +71,21 @@ jobs:
       - name: Debug-APK bauen
         run: flutter build apk --debug
 
-      # Bewusst v5 und nicht v7: ab v7 laedt die Action eine einzelne Datei
-      # "direkt" hoch, das Artefakt kommt dann als blanke .apk statt als ZIP.
-      # Waere hier sogar praktischer, ist aber eine eigene Entscheidung.
+      # Alle Flutter-Projekte bauen ein 'app-debug.apk' – heruntergeladen ist
+      # der Name nichtssagend. Ausserdem wird er unten zum Artefaktnamen.
+      - name: APK benennen
+        run: mv build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/joe-todo-debug.apk
+
+      # v7 wegen 'archive: false': damit landet die APK roh im Artefakt statt
+      # in einem ZIP, das man erst auspacken muesste. Dabei wird 'name'
+      # ignoriert, der Dateiname ist der Artefaktname – und es darf genau eine
+      # Datei sein, sonst bricht die Action ab.
+      # v7 laeuft ausserdem auf Node 24; bei upload-artifact kam die
+      # Laufzeitumstellung erst mit v6, v5 haengt noch an Node 20.
       - name: APK hochladen
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
-          name: joe-todo-debug-apk-${{ github.sha }}
-          path: software/joe-todo/app/build/app/outputs/flutter-apk/app-debug.apk
+          path: software/joe-todo/app/build/app/outputs/flutter-apk/joe-todo-debug.apk
+          archive: false
           if-no-files-found: error
           retention-days: 14
