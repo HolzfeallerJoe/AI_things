@@ -81,7 +81,7 @@ jobs:
           cache: true
 
       # Ohne diesen Schritt legt sich jeder Runner beim ersten Gradle-Lauf
-      # einen frischen ~/.android/debug.keystore an. Jede CI-APK traegt damit
+      # einen frischen Debug-Keystore an. Jede CI-APK traegt damit
       # eine andere Signatur – nicht nur gegenueber lokalen Builds, sondern
       # auch von einem CI-Lauf zum naechsten. Android verweigert jedes Update
       # ueber eine Signaturgrenze hinweg ("App nicht installiert"), die App
@@ -102,20 +102,30 @@ jobs:
             echo "::warning::Secret JOE_TODO_DEBUG_KEYSTORE fehlt - der Runner erzeugt einen eigenen Debug-Keystore. Die APK laesst sich dann nicht ueber eine vorhandene Installation legen."
             exit 0
           fi
-          mkdir -p "$HOME/.android"
           # 'tr -d' gegen Leerraum aus der Zwischenablage: ein angehaengtes
           # \r\n oder ein Zeilenumbruch mitten im Wert laesst 'base64 -d'
           # sonst mit "invalid input" abbrechen. In base64 selbst kommt
           # Leerraum nicht vor, es geht also nichts verloren.
-          printf '%s' "$DEBUG_KEYSTORE" | tr -d '[:space:]' | base64 -d > "$HOME/.android/debug.keystore"
+          ks="$RUNNER_TEMP/debug.keystore"
+          printf '%s' "$DEBUG_KEYSTORE" | tr -d '[:space:]' | base64 -d > "$ks"
           # Bricht ab, wenn die Datei kein brauchbarer Keystore ist. Besser
           # hier als spaeter in einer APK, die niemand installieren kann.
-          keytool -list -v \
-            -keystore "$HOME/.android/debug.keystore" \
-            -alias androiddebugkey \
-            -storepass android > "$RUNNER_TEMP/keystore.txt"
-          echo "Signatur dieses Builds:"
-          grep -E 'SHA1:|SHA256:' "$RUNNER_TEMP/keystore.txt"
+          keytool -list -v -keystore "$ks" \
+            -alias androiddebugkey -storepass android > "$RUNNER_TEMP/keystore.txt"
+
+          # Nicht nach $HOME/.android: AGP sucht den Debug-Keystore ueber
+          # ANDROID_USER_HOME / ANDROID_PREFS_ROOT / ANDROID_SDK_HOME und erst
+          # zuletzt in user.home. Auf dem Runner greift eine der vorderen
+          # Variablen -- eine Datei in $HOME/.android blieb unbenutzt, AGP
+          # erzeugte sich still einen eigenen Schluessel, und die APK war
+          # wieder nicht installierbar. android/app/build.gradle.kts liest
+          # deshalb JOE_DEBUG_KEYSTORE.
+          echo "JOE_DEBUG_KEYSTORE=$ks" >> "$GITHUB_ENV"
+
+          fp=$(grep -m1 'SHA256:' "$RUNNER_TEMP/keystore.txt" \
+               | sed 's/.*SHA256: *//' | tr -d ':' | tr 'A-Z' 'a-z')
+          echo "ERWARTETE_SIGNATUR=$fp" >> "$GITHUB_ENV"
+          echo "Erwartete Signatur: $fp"
 
       - name: Abhaengigkeiten holen
         run: flutter pub get
@@ -173,6 +183,26 @@ jobs:
       # der Name nichtssagend. Ausserdem wird er unten zum Artefaktnamen.
       - name: APK benennen
         run: mv build/app/outputs/flutter-apk/app-debug.apk "build/app/outputs/flutter-apk/${{ steps.version.outputs.apk }}"
+
+      # Der Beweis ist die fertige Datei, nicht das Log: dass der Keystore
+      # eingespielt wurde, heisst noch lange nicht, dass der Build ihn genommen
+      # hat -- genau daran ist es beim ersten Anlauf gescheitert, und gemerkt
+      # hat man es erst auf dem Telefon, nach 150 MB Download. Ohne Secret
+      # (Fork-PR) gibt es nichts zu vergleichen, dann entfaellt der Schritt.
+      - name: Signatur der APK pruefen
+        if: env.ERWARTETE_SIGNATUR != ''
+        run: |
+          apksigner=$(ls -1 "$ANDROID_HOME"/build-tools/*/apksigner | sort -V | tail -n1)
+          ist=$("$apksigner" verify --print-certs \
+                  "build/app/outputs/flutter-apk/${{ steps.version.outputs.apk }}" \
+                | sed -n 's/.*SHA-256 digest: *//p' | head -n1)
+          echo "erwartet: $ERWARTETE_SIGNATUR"
+          echo "ist:      $ist"
+          if [ "$ist" != "$ERWARTETE_SIGNATUR" ]; then
+            echo "::error::APK traegt nicht die Signatur des Projekt-Keystores - sie liesse sich nicht ueber eine vorhandene Installation legen."
+            exit 1
+          fi
+          echo "Signatur stimmt."
 
       # v7 wegen 'archive: false': damit landet die APK roh im Artefakt statt
       # in einem ZIP, das man erst auspacken muesste. Dabei wird 'name'
