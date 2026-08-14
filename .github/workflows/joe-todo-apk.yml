@@ -80,6 +80,43 @@ jobs:
           channel: stable
           cache: true
 
+      # Ohne diesen Schritt legt sich jeder Runner beim ersten Gradle-Lauf
+      # einen frischen ~/.android/debug.keystore an. Jede CI-APK traegt damit
+      # eine andere Signatur – nicht nur gegenueber lokalen Builds, sondern
+      # auch von einem CI-Lauf zum naechsten. Android verweigert jedes Update
+      # ueber eine Signaturgrenze hinweg ("App nicht installiert"), die App
+      # muesste also jedes Mal samt aller Daten deinstalliert werden. Der
+      # Keystore aus dem Secret ist derselbe, mit dem build-debug-apk.ps1
+      # lokal signiert; damit bleiben beide Wege untereinander updatefaehig.
+      #
+      # Kein echtes Geheimnis: das Passwort eines Debug-Keystores ist immer
+      # 'android'. Es liegt trotzdem als Secret, weil eine Schluesseldatei
+      # nichts im Repo zu suchen hat. Fehlt es – PR aus einem Fork, oder das
+      # Secret ist noch nicht angelegt –, baut der Lauf mit dem generierten
+      # Schluessel des Runners weiter, nur eben ohne Update-Pfad.
+      - name: Debug-Keystore einspielen
+        env:
+          DEBUG_KEYSTORE: ${{ secrets.JOE_TODO_DEBUG_KEYSTORE }}
+        run: |
+          if [ -z "$DEBUG_KEYSTORE" ]; then
+            echo "::warning::Secret JOE_TODO_DEBUG_KEYSTORE fehlt - der Runner erzeugt einen eigenen Debug-Keystore. Die APK laesst sich dann nicht ueber eine vorhandene Installation legen."
+            exit 0
+          fi
+          mkdir -p "$HOME/.android"
+          # 'tr -d' gegen Leerraum aus der Zwischenablage: ein angehaengtes
+          # \r\n oder ein Zeilenumbruch mitten im Wert laesst 'base64 -d'
+          # sonst mit "invalid input" abbrechen. In base64 selbst kommt
+          # Leerraum nicht vor, es geht also nichts verloren.
+          printf '%s' "$DEBUG_KEYSTORE" | tr -d '[:space:]' | base64 -d > "$HOME/.android/debug.keystore"
+          # Bricht ab, wenn die Datei kein brauchbarer Keystore ist. Besser
+          # hier als spaeter in einer APK, die niemand installieren kann.
+          keytool -list -v \
+            -keystore "$HOME/.android/debug.keystore" \
+            -alias androiddebugkey \
+            -storepass android > "$RUNNER_TEMP/keystore.txt"
+          echo "Signatur dieses Builds:"
+          grep -E 'SHA1:|SHA256:' "$RUNNER_TEMP/keystore.txt"
+
       - name: Abhaengigkeiten holen
         run: flutter pub get
 
@@ -163,8 +200,9 @@ jobs:
       # in pubspec.yaml die Versionsnummer anheben, dann entsteht ein neues
       # Release neben dem alten.
       #
-      # prerelease, weil es ein Debug-Build mit dem oeffentlichen
-      # Debug-Keystore ist – nichts, was man verteilen sollte.
+      # prerelease, weil es ein Debug-Build mit einem Debug-Keystore ist
+      # (Passwort 'android', oeffentlich bekannt) – nichts, was man verteilen
+      # sollte.
       - name: Release veroeffentlichen
         if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
         env:
@@ -178,7 +216,7 @@ jobs:
           cat > "$RUNNER_TEMP/notes.md" <<EOF
           - Projekt: \`software/joe-todo\`
           - Version: \`$VERSION\` (aus \`app/pubspec.yaml\`)
-          - Build: Debug, signiert mit dem Standard-Debug-Keystore
+          - Build: Debug, signiert mit dem Debug-Keystore des Projekts
           - Commit: $GITHUB_SHA
           - [Workflow-Lauf]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)
           EOF
