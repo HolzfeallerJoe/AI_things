@@ -35,9 +35,25 @@ dafuer sorgen, dass er nicht bei fremden Aenderungen mitlaeuft.
    Projekte nicht gegenseitig abbrechen.
 5. **`name:` mit Projekt-Praefix**, damit die Actions-Uebersicht bei mehreren
    Projekten lesbar bleibt.
+6. **Release-Tags als `<projekt>-v<version>`** (z. B. `joe-todo-v1.0.0+1`).
+   Alle Projekte teilen sich eine Release-Liste, deshalb muss am Tag haengen,
+   zu welchem Projekt und zu welcher Version ein Artefakt gehoert. Die Version
+   kommt aus der Projektdatei (bei Flutter `pubspec.yaml`), nicht aus einem
+   manuell gesetzten Tag. Releases nur von `main`, nicht aus Pull Requests.
 
 ## Vorhandene Workflows
 
 | Datei | Projekt | Was es tut |
 | --- | --- | --- |
-| `joe-todo-apk.yml` | `software/joe-todo` | Analyse, Unit-Tests, Debug-APK als Artefakt |
+| `joe-todo-apk.yml` | `software/joe-todo` | Analyse, Unit-Tests, Debug-APK als Artefakt und als Release `joe-todo-v<version>` |
+
+## Releases
+
+Ein Push auf `main` legt fuer das betroffene Projekt ein Release unter
+`<projekt>-v<version>` an. Bleibt die Version in der Projektdatei gleich, wird
+dasselbe Release ueberschrieben und der Tag auf den neuen Commit gesetzt — es
+gibt also je Version genau ein Release mit dem jeweils aktuellen Stand. Soll
+ein Stand dauerhaft erhalten bleiben, vorher die Versionsnummer anheben.
+
+Debug-Builds sind als **Pre-Release** markiert, weil sie mit dem oeffentlichen
+Debug-Keystore signiert sind.

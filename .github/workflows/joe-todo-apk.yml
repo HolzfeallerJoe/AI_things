@@ -19,8 +19,9 @@ on:
   # Manuell ausloesbar, falls man das APK ohne Aenderung braucht.
   workflow_dispatch:
 
+# write, weil der letzte Schritt ein Release samt Tag anlegt.
 permissions:
-  contents: read
+  contents: write
 
 # Bei mehreren Pushes hintereinander zaehlt nur der letzte.
 concurrency:
@@ -66,6 +67,21 @@ jobs:
       - name: Unit-Tests
         run: flutter test
 
+      # Die Version steht nur in der pubspec, nicht im Git-Tag – also wird sie
+      # von dort gelesen und traegt danach Dateinamen, Tag und Release-Titel.
+      # Format ist 'version: 1.2.3+4' (build-name + build-number).
+      - name: Version aus pubspec lesen
+        id: version
+        run: |
+          version="$(sed -n 's/^version:[[:space:]]*//p' pubspec.yaml | head -n1 | tr -d '\r')"
+          if [ -z "$version" ]; then
+            echo "Keine 'version:'-Zeile in pubspec.yaml gefunden." >&2
+            exit 1
+          fi
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "tag=joe-todo-v$version" >> "$GITHUB_OUTPUT"
+          echo "apk=joe-todo-v$version-debug.apk" >> "$GITHUB_OUTPUT"
+
       # Debug statt Release: fuer Release fehlt ein eigener Signing-Key, der
       # Standard waere der Debug-Keystore. Entspricht build-debug-apk.ps1.
       - name: Debug-APK bauen
@@ -74,7 +90,7 @@ jobs:
       # Alle Flutter-Projekte bauen ein 'app-debug.apk' – heruntergeladen ist
       # der Name nichtssagend. Ausserdem wird er unten zum Artefaktnamen.
       - name: APK benennen
-        run: mv build/app/outputs/flutter-apk/app-debug.apk build/app/outputs/flutter-apk/joe-todo-debug.apk
+        run: mv build/app/outputs/flutter-apk/app-debug.apk "build/app/outputs/flutter-apk/${{ steps.version.outputs.apk }}"
 
       # v7 wegen 'archive: false': damit landet die APK roh im Artefakt statt
       # in einem ZIP, das man erst auspacken muesste. Dabei wird 'name'
@@ -85,7 +101,49 @@ jobs:
       - name: APK hochladen
         uses: actions/upload-artifact@v7
         with:
-          path: software/joe-todo/app/build/app/outputs/flutter-apk/joe-todo-debug.apk
+          path: software/joe-todo/app/build/app/outputs/flutter-apk/${{ steps.version.outputs.apk }}
           archive: false
           if-no-files-found: error
           retention-days: 14
+
+      # Nur von main: aus einem PR-Build soll kein Release entstehen. Das
+      # Artefakt oben gibt es dort trotzdem.
+      #
+      # Der Tag traegt Projekt und Version ('joe-todo-v1.0.0+1'), damit in der
+      # gemeinsamen Release-Liste des Repos erkennbar bleibt, wozu ein Release
+      # gehoert. Solange die pubspec-Version gleich bleibt, zeigt derselbe Tag
+      # immer auf den letzten main-Commit – dafuer wird ein vorhandenes Release
+      # samt Tag geloescht und neu angelegt ('gh release edit --target' wuerde
+      # einen bestehenden Tag nicht verschieben). Fuer eine dauerhafte Version
+      # in pubspec.yaml die Versionsnummer anheben, dann entsteht ein neues
+      # Release neben dem alten.
+      #
+      # prerelease, weil es ein Debug-Build mit dem oeffentlichen
+      # Debug-Keystore ist – nichts, was man verteilen sollte.
+      - name: Release veroeffentlichen
+        if: github.event_name != 'pull_request' && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.version.outputs.tag }}
+          VERSION: ${{ steps.version.outputs.version }}
+          APK: ${{ steps.version.outputs.apk }}
+        run: |
+          # Heredoc statt '--notes "..."', weil die YAML-Einrueckung sonst in
+          # den Release-Text wandert und Markdown daraus Code-Bloecke macht.
+          cat > "$RUNNER_TEMP/notes.md" <<EOF
+          - Projekt: \`software/joe-todo\`
+          - Version: \`$VERSION\` (aus \`app/pubspec.yaml\`)
+          - Build: Debug, signiert mit dem Standard-Debug-Keystore
+          - Commit: $GITHUB_SHA
+          - [Workflow-Lauf]($GITHUB_SERVER_URL/$GITHUB_REPOSITORY/actions/runs/$GITHUB_RUN_ID)
+          EOF
+
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release delete "$TAG" --yes --cleanup-tag
+          fi
+          gh release create "$TAG" \
+            "build/app/outputs/flutter-apk/$APK" \
+            --title "joe-todo $VERSION (Debug)" \
+            --target "$GITHUB_SHA" \
+            --prerelease \
+            --notes-file "$RUNNER_TEMP/notes.md"
