@@ -108,8 +108,29 @@ jobs:
 
       # Debug statt Release: fuer Release fehlt ein eigener Signing-Key, der
       # Standard waere der Debug-Keystore. Entspricht build-debug-apk.ps1.
+      #
+      # Die env-Dateien (app/env/, siehe lib/env.dart) sind nicht im Repo, sie
+      # duerfen Geheimnisse enthalten. Steht das Secret JOE_TODO_ENV bereit,
+      # wird daraus env/.env geschrieben und mit --dart-define-from-file in
+      # den Build gegeben; sonst baut derselbe Befehl ohne das Flag, also mit
+      # den Standardwerten aus lib/env.dart.
+      #
+      # Das 'sonst' ist kein Notnagel, sondern der Normalfall fuer PRs aus
+      # einem Fork: die bekommen keine Secrets, und daran soll kein Lauf
+      # scheitern. Die Datei selbst wandert nicht ins APK – nur die Werte, die
+      # der Kode auch liest.
       - name: Debug-APK bauen
-        run: flutter build apk --debug
+        env:
+          ENV_DEV: ${{ secrets.JOE_TODO_ENV }}
+        run: |
+          if [ -n "$ENV_DEV" ]; then
+            printf '%s\n' "$ENV_DEV" > env/.env
+            echo "env/.env aus dem Secret JOE_TODO_ENV geschrieben"
+            flutter build apk --debug --dart-define-from-file=env/.env
+          else
+            echo "Kein Secret JOE_TODO_ENV gesetzt – Build mit den Standardwerten aus lib/env.dart"
+            flutter build apk --debug
+          fi
 
       # Alle Flutter-Projekte bauen ein 'app-debug.apk' – heruntergeladen ist
       # der Name nichtssagend. Ausserdem wird er unten zum Artefaktnamen.
