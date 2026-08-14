@@ -41,13 +41,35 @@ jobs:
       - uses: actions/checkout@v5
 
       # AGP 8.11 und Gradle 8.14 laufen auf JDK 17; app/build.gradle.kts
-      # kompiliert ohnehin gegen 17.
+      # kompiliert ohnehin gegen 17. ubuntu-24.04 hat Temurin 17 schon als
+      # Default, der Schritt kostet also nur Sekunden – er haelt die Version
+      # aber fest, falls GitHub das Standard-JDK des Images anhebt.
+      #
+      # Kein 'cache: gradle' mehr: dessen Schluessel haengt am Hash der
+      # *.gradle*-Dateien. Aendern die sich nicht, ist es ein exakter Treffer
+      # und die Action speichert gar nicht erst neu – ein Build-Cache koennte
+      # sich so nie fuellen. Das uebernimmt setup-gradle unten.
       - name: JDK 17 einrichten
         uses: actions/setup-java@v5
         with:
           distribution: temurin
           java-version: '17'
-          cache: gradle
+
+      # Legt Init-Skripte im Gradle User Home ab und greift damit fuer "all
+      # Gradle executions on the runner, no matter how Gradle is invoked" –
+      # also auch fuer das Gradle, das 'flutter build apk' startet.
+      #
+      # Gegenueber setup-java: rollierende Cache-Schluessel (jeder Lauf
+      # schreibt zurueck, deshalb waechst der Build-Cache aus
+      # 'caches/build-cache-1' ueberhaupt erst an) und 'cache-cleanup', das
+      # per Default 'on-success' unbenutzte Dateien vor dem Speichern
+      # wegraeumt. Letzteres ist hier wichtig: das Repo lag mit den alten
+      # setup-java-Caches bei ~9 von 10 GB Cache-Budget.
+      #
+      # Geschrieben wird per Default nur von der Standard-Branch, PRs lesen
+      # nur – genau richtig.
+      - name: Gradle-Cache einrichten
+        uses: gradle/actions/setup-gradle@v6
 
       # Feste Version statt 'stable', damit CI und Arbeitsplatz dasselbe
       # bauen. Beim Hochziehen hier und lokal gemeinsam anheben.
@@ -61,11 +83,13 @@ jobs:
       - name: Abhaengigkeiten holen
         run: flutter pub get
 
+      # --no-pub, weil der Schritt darueber schon aufgeloest hat; sonst prueft
+      # jeder der beiden die Abhaengigkeiten noch einmal nach.
       - name: Analyse
-        run: flutter analyze
+        run: flutter analyze --no-pub
 
       - name: Unit-Tests
-        run: flutter test
+        run: flutter test --no-pub
 
       # Die Version steht nur in der pubspec, nicht im Git-Tag – also wird sie
       # von dort gelesen und traegt danach Dateinamen, Tag und Release-Titel.
