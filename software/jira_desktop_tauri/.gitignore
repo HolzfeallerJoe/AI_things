@@ -1,0 +1,12 @@
+# Rust build output
+target/
+
+# Local runtime config (contains your Jira address and e-mail)
+config.json
+
+# IDE and OS files
+.vscode/*
+!.vscode/settings.json
+.idea/
+.DS_Store
+Thumbs.db
