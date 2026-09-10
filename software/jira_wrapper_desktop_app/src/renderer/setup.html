@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <title>Jira Desktop setup</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --bg: #1f1f21;
+        --panel: #2a2a2d;
+        --text: #e8e8ea;
+        --muted: #9a9aa2;
+        --accent: #4c8dff;
+        --danger: #ff6b6b;
+        --border: #3a3a3f;
+      }
+      * { box-sizing: border-box; }
+      body {
+        margin: 0;
+        padding: 32px;
+        background: var(--bg);
+        color: var(--text);
+        font: 14px/1.5 "Segoe UI", system-ui, sans-serif;
+      }
+      h1 { margin: 0 0 6px; font-size: 19px; font-weight: 600; }
+      p.lede { margin: 0 0 24px; color: var(--muted); }
+      label { display: block; margin-bottom: 8px; font-weight: 600; font-size: 13px; }
+      input {
+        width: 100%;
+        padding: 10px 12px;
+        border-radius: 6px;
+        border: 1px solid var(--border);
+        background: var(--panel);
+        color: var(--text);
+        font: inherit;
+      }
+      input:focus { outline: 2px solid var(--accent); outline-offset: 1px; border-color: transparent; }
+      .hint { margin-top: 8px; color: var(--muted); font-size: 12.5px; }
+      .error { margin-top: 12px; color: var(--danger); font-size: 13px; min-height: 19px; }
+      button {
+        margin-top: 20px;
+        padding: 10px 18px;
+        border: 0;
+        border-radius: 6px;
+        background: var(--accent);
+        color: #fff;
+        font: inherit;
+        font-weight: 600;
+        cursor: pointer;
+      }
+      button:hover { filter: brightness(1.1); }
+    </style>
+  </head>
+  <body>
+    <h1>Which Jira should this window open?</h1>
+    <p class="lede">Stored locally on this machine only &mdash; it never lands in the repository.</p>
+
+    <form id="form">
+      <label for="domain">Jira address</label>
+      <input
+        id="domain"
+        name="domain"
+        type="text"
+        placeholder="your-company.atlassian.net"
+        autocomplete="off"
+        spellcheck="false"
+        autofocus
+      />
+      <p class="hint">Paste the address you normally use. A full URL is fine &mdash; it gets trimmed down for you.</p>
+      <p class="error" id="error"></p>
+      <button type="submit">Open Jira</button>
+    </form>
+
+    <script>
+      const form = document.getElementById('form');
+      const input = document.getElementById('domain');
+      const error = document.getElementById('error');
+
+      window.setup.current().then((domain) => {
+        if (domain) input.value = domain;
+        input.select();
+      });
+
+      form.addEventListener('submit', async (event) => {
+        event.preventDefault();
+        error.textContent = '';
+        const result = await window.setup.save(input.value);
+        if (!result.ok) {
+          error.textContent = result.error ?? 'Could not save that address.';
+          input.select();
+        }
+      });
+    </script>
+  </body>
+</html>

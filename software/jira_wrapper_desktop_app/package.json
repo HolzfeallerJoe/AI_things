@@ -1,0 +1,59 @@
+{
+  "name": "jira-desktop",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A dedicated desktop window for Jira, so it does not have to live in a browser tab",
+  "main": "out/main/main.js",
+  "scripts": {
+    "build": "tsc",
+    "icon": "node scripts/generate-icon.mjs",
+    "start": "npm run build && electron .",
+    "typecheck": "tsc --noEmit",
+    "dist": "npm run build && electron-builder",
+    "pack": "npm run build && electron-builder --dir"
+  },
+  "license": "MIT",
+  "engines": {
+    "node": ">=20"
+  },
+  "devDependencies": {
+    "@types/node": "^22.20.2",
+    "electron": "^44.3.0",
+    "electron-builder": "^26.15.3",
+    "typescript": "^7.0.2"
+  },
+  "author": "Holzfealler_Joe",
+  "build": {
+    "appId": "com.holzfeallerjoe.jira-desktop",
+    "productName": "Jira Desktop",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "out/**/*",
+      "src/renderer/**/*",
+      "package.json"
+    ],
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "icon": "build/icon.png"
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true,
+      "shortcutName": "Jira Desktop",
+      "artifactName": "Jira-Desktop-Setup-${version}.${ext}"
+    }
+  }
+}

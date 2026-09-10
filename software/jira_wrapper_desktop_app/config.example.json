@@ -1,0 +1,9 @@
+{
+  "_comment": "Reference only. The real file is written to the app's userData directory at first run, never here.",
+  "domain": "your-company.atlassian.net",
+  "window": {
+    "width": 1440,
+    "height": 900,
+    "maximized": false
+  }
+}
