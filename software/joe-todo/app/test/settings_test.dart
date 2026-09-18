@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:joe_todo/models.dart';
 import 'package:joe_todo/pets.dart';
 import 'package:joe_todo/screens/settings.dart';
+import 'package:joe_todo/widgets.dart' show PaperCard;
 
 /// Die Einstellungen mit leerem Bestand. Das Fenster ist breit (die
 /// Testschrift setzt jedes Zeichen auf ein volles Quadrat) und hoch, damit
@@ -140,9 +141,15 @@ void main() {
         tester.getSemantics(inSheet(find.text('Keine Farbe'))),
         isSemantics(isSelected: true, isButton: true),
       );
-      // Alle 25 Farben stehen zur Wahl.
+      // Alle 25 Farben stehen zur Wahl, und bei "Keine Farbe" ist keine
+      // davon markiert.
       for (final name in taskPaletteNames) {
         expect(inSheet(find.bySemanticsLabel('Farbe $name')), findsOneWidget);
+        expect(
+          tester.getSemantics(inSheet(find.bySemanticsLabel('Farbe $name'))),
+          isSemantics(isSelected: false),
+          reason: name,
+        );
       }
 
       await tester.tap(inSheet(find.bySemanticsLabel('Farbe Mint')));
@@ -180,9 +187,12 @@ void main() {
       Rect dot(int i) => tester.getRect(
           inSheet(find.bySemanticsLabel('Farbe ${taskPaletteNames[i]}')));
       final first = dot(0);
+      final fifth = dot(4);
       final sixth = dot(5);
-      expect(first.width, greaterThanOrEqualTo(40));
-      // Fuenf je Reihe: der sechste beginnt die zweite Reihe.
+      expect(first.width, moreOrLessEquals(44));
+      // Fuenf je Reihe: der fuenfte steht noch in der ersten, der sechste
+      // beginnt die zweite.
+      expect(fifth.top, moreOrLessEquals(first.top));
       expect(sixth.left, moreOrLessEquals(first.left, epsilon: 0.5));
       expect(sixth.top, greaterThan(first.bottom));
     });
@@ -224,5 +234,35 @@ void main() {
       expect(state.shoppingMode, ShoppingListMode.tab);
       semantics.dispose();
     });
+  });
+
+  testWidgets('Tippzeilen malen ihre Tintenwelle auf der Karte',
+      (tester) async {
+    // Eine ListTile malt auf das naechste Material darueber. Laege das
+    // ausserhalb der PaperCard (das Scaffold), malte sie unter die
+    // Papierfarbe – die Welle bliebe unsichtbar. PaperCard bringt deshalb
+    // selbst eine durchsichtige Materialschicht mit.
+    await pumpSettings(tester);
+
+    final tiles = find.byType(ListTile);
+    expect(tiles, findsWidgets);
+    for (final tile in tiles.evaluate()) {
+      // Die Vorfahren kommen vom naechsten an: .first ist das Material,
+      // auf das die Zeile malt.
+      final material = find
+          .ancestor(
+            of: find.byWidget(tile.widget),
+            matching: find.byType(Material),
+          )
+          .first;
+      expect(
+        tester.widget<Material>(material).type,
+        MaterialType.transparency,
+      );
+      expect(
+        find.ancestor(of: material, matching: find.byType(PaperCard)),
+        findsOneWidget,
+      );
+    }
   });
 }

@@ -282,6 +282,14 @@ JoeTheme joeThemeOf(BuildContext context) {
 }
 
 /// Cream paper card with a soft shadow, like a note pinned on the board.
+///
+/// Das Kind liegt in einer durchsichtigen [Material]-Schicht. Zeilen, die
+/// beim Antippen eine Tintenwelle malen (ListTile, SwitchListTile, InkWell),
+/// malen auf das naechste Material darueber – ohne diese Schicht laege das
+/// *unter* der Papierfarbe der Karte, die Welle bliebe unsichtbar, und
+/// Flutter meldete das im Debug-Build als Fehler. Durchsichtig heisst: kein
+/// eigener Hintergrund, kein Schatten, kein Clip – die Karte sieht aus wie
+/// vorher.
 class PaperCard extends StatelessWidget {
   final Widget child;
   final EdgeInsetsGeometry padding;
@@ -311,7 +319,11 @@ class PaperCard extends StatelessWidget {
           ),
         ],
       ),
-      child: child,
+      child: Material(
+        type: MaterialType.transparency,
+        borderRadius: BorderRadius.circular(16),
+        child: child,
+      ),
     );
   }
 }
@@ -1040,11 +1052,15 @@ Future<T?> showJoeSheet<T>(
 /// Ein Blatt von unten, das nach einem einzelnen Text fragt – zum Beispiel
 /// nach dem Namen eines eigenen Symptoms. Gibt den Text zurueck, oder null,
 /// wenn abgebrochen wurde.
+///
+/// [emptyMessage] ist der Hinweis, wenn beim Speichern nichts im Feld steht.
+/// Nicht jeder Text ist ein Name – ein Einkaufs-Eintrag etwa nicht.
 Future<String?> showTextEntrySheet(
   BuildContext context, {
   required String title,
   required String hint,
   String initialText = '',
+  String emptyMessage = 'Bitte gib einen Namen ein.',
 }) {
   return showJoeSheet<String>(
     context,
@@ -1057,7 +1073,7 @@ Future<String?> showTextEntrySheet(
           onPressed: () {
             final text = controller.text.trim();
             if (text.isEmpty) {
-              JoeToast.error('Bitte gib einen Namen ein.');
+              JoeToast.error(emptyMessage);
               return;
             }
             Navigator.pop(sheetContext, text);
@@ -1148,21 +1164,37 @@ void showAppointmentOptions(BuildContext context, Appointment appointment) {
 
 /// The 25 warm colors as dots. At this count the dots are deliberately small
 /// so the whole palette stays on a few rows inside an input sheet.
+///
+/// Wo mehr Platz ist (das Farbblatt einer Prioritaet in den Einstellungen),
+/// werden die Punkte ueber [dotSize] groesser, und [columns] stellt die
+/// Palette auf eine feste Zahl Punkte je Reihe. Ohne [columns] fliessen sie
+/// wie bisher, so viele je Reihe, wie Platz ist.
 class ColorDotPicker extends StatelessWidget {
-  final int selected;
+  /// Der markierte Punkt; null heisst: keiner ("Keine Farbe").
+  final int? selected;
   final ValueChanged<int> onChanged;
+
+  /// Durchmesser eines Punkts; das Haekchen waechst mit.
+  final double dotSize;
+
+  /// Feste Zahl Punkte je Reihe, oder null fuer so viele, wie passen.
+  final int? columns;
+
+  static const double _spacing = 8;
 
   const ColorDotPicker({
     super.key,
     required this.selected,
     required this.onChanged,
+    this.dotSize = 28,
+    this.columns,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Wrap(
-      spacing: 8,
-      runSpacing: 8,
+    final wrap = Wrap(
+      spacing: _spacing,
+      runSpacing: _spacing,
       children: [
         for (int i = 0; i < taskPalette.length; i++)
           GestureDetector(
@@ -1171,8 +1203,8 @@ class ColorDotPicker extends StatelessWidget {
               label: 'Farbe ${taskPaletteNames[i]}',
               selected: i == selected,
               child: Container(
-                width: 28,
-                height: 28,
+                width: dotSize,
+                height: dotSize,
                 decoration: BoxDecoration(
                   color: taskPalette[i],
                   shape: BoxShape.circle,
@@ -1187,12 +1219,22 @@ class ColorDotPicker extends StatelessWidget {
                       : null,
                 ),
                 child: i == selected
-                    ? const Icon(Icons.check, size: 15, color: Colors.white)
+                    // 15 bei 28 – dasselbe Verhaeltnis in jeder Groesse.
+                    ? Icon(Icons.check,
+                        size: dotSize * 15 / 28, color: Colors.white)
                     : null,
               ),
             ),
           ),
       ],
+    );
+    final cols = columns;
+    if (cols == null) return wrap;
+    // Genau so breit, dass [cols] Punkte samt Abstaenden in eine Reihe
+    // passen – der naechste bricht um.
+    return SizedBox(
+      width: cols * dotSize + (cols - 1) * _spacing,
+      child: wrap,
     );
   }
 }
