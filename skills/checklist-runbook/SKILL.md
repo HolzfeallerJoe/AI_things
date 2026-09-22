@@ -1,6 +1,6 @@
 ---
 name: checklist-runbook
-description: Build a single-file, self-contained HTML runbook — an interactive checklist with saved progress, filtering, and embedded screenshots. Use when asked for a test plan, QA checklist, release runbook, onboarding guide, migration plan, or any "give me a checklist / step-by-step doc" that a person will work through and tick off. Also use when converting an existing Markdown checklist into something usable.
+description: Build interactive HTML runbooks only when explicitly invoked or when the request contains "HTML plan".
 ---
 
 # Checklist runbook
