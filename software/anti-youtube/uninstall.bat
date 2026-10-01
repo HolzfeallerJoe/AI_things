@@ -13,11 +13,7 @@ echo.
 pause
 echo.
 
-echo Stopping running instance...
-taskkill /F /IM anti-youtube.exe >nul 2>&1
-timeout /t 1 /nobreak >nul
-
-echo Running cleanup (accept the UAC prompt)...
+echo Stopping running instance and cleaning up (accept the UAC prompt)...
 powershell -NoProfile -Command "Start-Process -FilePath '%~dp0anti-youtube.exe' -ArgumentList '--uninstall' -Verb RunAs -Wait"
 
 echo.

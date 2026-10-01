@@ -358,8 +358,43 @@ def _delete_reg_key_tree(hive: int, path: str) -> None:
         pass
 
 
+def _stop_other_instances() -> None:
+    """Kill running Anti-YouTube processes except this one and its parent.
+
+    The tray instance runs elevated, so this must run from an elevated
+    process too. The parent is spared because a PyInstaller onefile build
+    runs as bootloader + child, and the bootloader is our parent.
+    """
+    if not IS_WINDOWS:
+        return
+    image = Path(sys.executable).name if getattr(sys, "frozen", False) else "anti-youtube.exe"
+    spare = {os.getpid(), os.getppid()}
+    kwargs = {"capture_output": True, "text": True, "creationflags": 0x08000000}
+    try:
+        res = subprocess.run(
+            ["tasklist", "/FO", "CSV", "/NH", "/FI", f"IMAGENAME eq {image}"],
+            **kwargs,
+        )
+    except Exception:
+        return
+    for line in res.stdout.splitlines():
+        parts = [p.strip('"') for p in line.split('","')]
+        if len(parts) < 2 or not parts[1].isdigit():
+            continue
+        pid = int(parts[1])
+        if pid in spare:
+            continue
+        try:
+            subprocess.run(["taskkill", "/F", "/PID", str(pid)], **kwargs)
+        except Exception:
+            pass
+    time.sleep(1)  # let the killed processes release their file handles
+
+
 def uninstall() -> None:
     """Remove the hosts entry, state file, and registered URL protocol."""
+    # Stop the tray instance first, otherwise its ticker may re-apply the block.
+    _stop_other_instances()
     try:
         original = HOSTS_PATH.read_text(encoding="utf-8")
         stripped = _strip_block(original)
