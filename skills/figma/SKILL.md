@@ -20,6 +20,10 @@ The wrapper requires environment variables from `C:\Users\Dominik\Projects\Priva
   - `FIGMA_USE_TEAM_VAULT` (`true`/`false`)
   - `FIGMA_PROMPT_CONTEXT` (if it contains `team vault`, team-vault profile is selected)
 
+## Missing dependencies
+
+If dependencies needed to run the wrapper are missing, you may install the dependencies declared in its package.json without asking for additional approval. Run npm ci in the wrapper directory when a package-lock.json exists; otherwise run npm install. Preserve declared versions and avoid global installs. Retry the operation after installation. If installation or the retried operation fails, follow the user's stopping instructions and report the error.
+
 ## Code Pattern
 
 **IMPORTANT**: Always wrap code in an async function - top-level await is not supported with tsx/cjs.
