@@ -15,10 +15,24 @@ The wrapper requires environment variables from `C:\Users\Dominik\Projects\Priva
   - `FIGMA_TEAM_VAULT_ACCESS_TOKEN`
   - `FIGMA_TEAM_VAULT_TEAM_ID`
   - `FIGMA_TEAM_VAULT_USER_ID`
-- Optional profile switches:
+- Wrapper profile switches, overridden by the required access order below:
   - `FIGMA_CREDENTIAL_PROFILE` (`default` or `team_vault`)
   - `FIGMA_USE_TEAM_VAULT` (`true`/`false`)
   - `FIGMA_PROMPT_CONTEXT` (if it contains `team vault`, team-vault profile is selected)
+
+## Required access order
+
+Always access Figma through the TypeScript wrapper in this order:
+
+1. Try the requested read operation with the private profile using `resolveFigmaCredentials({ forceProfile: 'default' })`.
+2. If the private profile cannot complete that read operation, including missing credentials or denied access, try the same read operation with the team profile using `resolveFigmaCredentials({ forceProfile: 'team_vault' })`.
+3. If both profiles fail, inform the user that the design could not be accessed through either profile. Summarize the failure for each profile without exposing credentials. Stop the design inspection and report which findings remain unverified.
+
+Use this order even when the file appears to belong to a team or company. Do not infer a credential profile from a Jira project, file name, or URL. Set `forceProfile` explicitly so environment variables and prompt context cannot change the order.
+
+Do not open, inspect, or test Figma designs or prototypes through a browser. This also applies when the wrapper cannot access a design or does not support a Figma Make prototype. Inform the user about the limitation instead of switching to browser access. Inspect exported design images obtained through the wrapper with local image tools.
+
+Retrying with another profile is for read operations. Do not automatically repeat a write after an ambiguous outcome; verify whether it succeeded before retrying.
 
 ## Missing dependencies
 
@@ -39,12 +53,8 @@ import {
 config({ path: 'C:/Users/Dominik/Projects/Private/AI_things/wrapper/Figma/.env' });
 
 async function main() {
-  const creds = resolveFigmaCredentials({
-    // Prefer forceProfile for deterministic scripts:
-    // forceProfile: 'team_vault',
-    // Or allow prompt-driven profile selection:
-    promptText: process.env.FIGMA_PROMPT_CONTEXT,
-  });
+  // Always try the private profile first.
+  const creds = resolveFigmaCredentials({ forceProfile: 'default' });
 
   const figma = new FigmaClient({
     accessToken: creds.accessToken,
@@ -174,7 +184,8 @@ for (const comp of components.meta.components) {
 - **Always wrap in async function** - No top-level await support
 - **Always load `.env`** with the correct path using `config({ path: '...' })`
 - **Use `resolveFigmaCredentials()`** instead of reading `FIGMA_ACCESS_TOKEN` directly
-- **For team files, prefer `forceProfile: 'team_vault'`** so profile choice is explicit
+- **Always try the private profile first, then the team profile** using explicit `forceProfile` values. If both fail, inform the user and stop design inspection.
+- **Do not inspect Figma designs or prototypes through a browser.** Use wrapper reads and exported images only.
 - **Use file keys, not URLs** - Extract with `extractFileKey(url)`
 - Node IDs use `:` format (e.g., `1:2`) but URLs use `-` format (e.g., `1-2`)
 - Rate limits apply - use `retryWithBackoff()` for automatic retries
