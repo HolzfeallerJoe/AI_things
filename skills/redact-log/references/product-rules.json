@@ -1,0 +1,408 @@
+{
+  "version": 1,
+  "profiles": {
+    "general": {
+      "detect": [],
+      "fields": {}
+    },
+    "x-core": {
+      "detect": [
+        "X-Core"
+      ],
+      "fields": {
+        "registrationDate": "PERSONAL_DATE",
+        "licenseCode": "SECRET",
+        "registrationCode": "SECRET",
+        "hardwareId": "DEVICE_ID",
+        "computerName": "DEVICE_NAME"
+      }
+    },
+    "media": {
+      "detect": [
+        "YouTube Song Downloader",
+        "YouTubeSongDownloader",
+        "Doku Downloader",
+        "DokuDownloader",
+        "Mediatheken Downloader",
+        "MediathekenDownloader",
+        "Abelssoft X-Loader",
+        "AbelssoftXLoader",
+        "AlbumDetail",
+        "AlbumSearch"
+      ],
+      "fields": {
+        "title": "CONTENT",
+        "name": "CONTENT",
+        "album": "CONTENT",
+        "artist": "CONTENT",
+        "track": "CONTENT",
+        "groupName": "CONTENT",
+        "searchTerm": "CONTENT",
+        "searchQuery": "CONTENT",
+        "query": "CONTENT",
+        "keyword": "CONTENT",
+        "keywords": "CONTENT",
+        "groupId": "CONTENT_ID",
+        "videoId": "CONTENT_ID",
+        "trackId": "CONTENT_ID",
+        "groupThumbnail": "URL",
+        "thumbnail": "URL",
+        "link": "URL",
+        "file": "PATH",
+        "filename": "FILE",
+        "localPath": "PATH",
+        "s": "SECRET",
+        "sig": "SECRET",
+        "lsig": "SECRET",
+        "spc": "SECRET",
+        "bui": "SECRET",
+        "n": "SECRET",
+        "ei": "SESSION_ID",
+        "description": "CONTENT",
+        "theme": "CONTENT",
+        "channel": "CONTENT",
+        "uploader": "CONTENT",
+        "creator": "CONTENT",
+        "uploaderName": "CONTENT",
+        "series": "CONTENT",
+        "seasonTitle": "CONTENT",
+        "id": "CONTENT_ID",
+        "channel_id": "CONTENT_ID",
+        "uploader_id": "CONTENT_ID",
+        "webpage_url": "URL",
+        "channel_url": "URL",
+        "uploader_url": "URL",
+        "thumbnail_url": "URL"
+      },
+      "patterns": [
+        {
+          "category": "CONTENT",
+          "pattern": "Clipboard: Got information for item (?P<value>[^\\r\\n]+)"
+        },
+        {
+          "category": "URL",
+          "pattern": "Clipboard: There has been a clipboard match for (?P<value>[^\\r\\n]+)"
+        }
+      ]
+    },
+    "keydepot": {
+      "detect": [
+        "KeyDepot",
+        "CloudService",
+        "Cloud Safe"
+      ],
+      "fields": {
+        "username": "USER",
+        "safeName": "FILE",
+        "keypath": "PATH",
+        "keyfile": "PATH",
+        "masterPassword": "SECRET",
+        "entry": "CONTENT",
+        "entries": "CONTENT",
+        "notes": "CONTENT",
+        "login": "USER",
+        "url": "URL",
+        "title": "CONTENT",
+        "name": "CONTENT"
+      },
+      "patterns": [
+        {
+          "category": "FILE",
+          "pattern": "(?:Attempt to create a backup safe for |Using safe |Selected safe )(?P<value>[^\\r\\n]+)"
+        },
+        {
+          "category": "USER",
+          "pattern": "\\bUser (?P<value>[^\\r\\n]+?) exists\\b"
+        },
+        {
+          "category": "USER",
+          "pattern": "(?:cloud safe for user |empty for user |deleted for user )(?P<value>[^\\r\\n]+)"
+        }
+      ]
+    },
+    "sendme": {
+      "detect": [
+        "SendMe",
+        "sendme",
+        "qrsend",
+        "QRSend",
+        "send2phone",
+        "UDPDevice",
+        "QR Share"
+      ],
+      "fields": {
+        "name": "DEVICE_NAME",
+        "alias": "DEVICE_NAME",
+        "sender": "DEVICE_ID",
+        "receiver": "DEVICE_ID",
+        "senderId": "DEVICE_ID",
+        "receiverId": "DEVICE_ID",
+        "senderIp": "IP",
+        "receiverIp": "IP",
+        "pairToken": "SECRET",
+        "pairingToken": "SECRET",
+        "pin": "SECRET",
+        "inviteCode": "SECRET",
+        "shareToken": "SECRET",
+        "peerId": "DEVICE_ID",
+        "contactId": "PERSON_ID",
+        "deviceUuid": "DEVICE_ID",
+        "text": "CONTENT",
+        "messageText": "CONTENT",
+        "clipboard": "CONTENT",
+        "filename": "FILE",
+        "fileName": "FILE",
+        "file": "PATH",
+        "path": "PATH",
+        "uri": "URL"
+      }
+    },
+    "everdoc": {
+      "detect": [
+        "EverDoc",
+        "everdoc",
+        "Everdoc"
+      ],
+      "fields": {
+        "documentName": "FILE",
+        "documentTitle": "CONTENT",
+        "ocrText": "CONTENT",
+        "recognizedText": "CONTENT",
+        "documentText": "CONTENT",
+        "document": "CONTENT",
+        "documents": "CONTENT",
+        "qrCode": "SECRET",
+        "scanResult": "SECRET",
+        "connectionCode": "SECRET",
+        "tags": "CONTENT",
+        "filename": "FILE",
+        "fileName": "FILE",
+        "title": "CONTENT",
+        "name": "CONTENT"
+      }
+    },
+    "scamcheck": {
+      "detect": [
+        "ScamCheck",
+        "scamcheck",
+        "ScamCheckApi",
+        "ProgramApi"
+      ],
+      "fields": {
+        "text": "CONTENT",
+        "input": "CONTENT",
+        "content": "CONTENT",
+        "analysisText": "CONTENT",
+        "sharedText": "CONTENT",
+        "scannedText": "CONTENT",
+        "screenshot": "CONTENT",
+        "receipt": "SECRET",
+        "appStoreReceipt": "SECRET",
+        "latestReceipt": "SECRET",
+        "purchaseToken": "SECRET",
+        "transactionReceipt": "SECRET",
+        "transactionId": "PURCHASE_ID",
+        "originalTransactionId": "PURCHASE_ID",
+        "transactionIdentifier": "PURCHASE_ID",
+        "originalTransactionIdentifier": "PURCHASE_ID",
+        "orderId": "PURCHASE_ID",
+        "signature": "SECRET",
+        "url": "URL"
+      }
+    },
+    "voice2mail": {
+      "detect": [
+        "Voice2Mail",
+        "voice2mail",
+        "voice2mail-api",
+        "SendQueueService",
+        "STORAGE voiceList"
+      ],
+      "fields": {
+        "recipients": "EMAIL",
+        "recipient": "EMAIL",
+        "emailList": "EMAIL",
+        "emails": "EMAIL",
+        "subject": "CONTENT",
+        "body": "CONTENT",
+        "transcript": "CONTENT",
+        "transcription": "CONTENT",
+        "voiceList": "CONTENT",
+        "recordingList": "CONTENT",
+        "location": "LOCATION",
+        "locationName": "LOCATION",
+        "coordinates": "LOCATION",
+        "name": "CONTENT",
+        "file": "PATH",
+        "dateTime": "PERSONAL_DATE",
+        "x-v2m-installation-id": "DEVICE_ID",
+        "x-v2m-key-id": "DEVICE_ID",
+        "x-v2m-integrity": "SECRET",
+        "x-v2m-assertion": "SECRET",
+        "attestation": "SECRET",
+        "assertion": "SECRET",
+        "principalId": "PERSON_ID",
+        "smtpUser": "USER",
+        "smtpPassword": "SECRET"
+      },
+      "patterns": [
+        {
+          "category": "FILE",
+          "pattern": "\\bUploading (?P<value>.+?) for emails "
+        },
+        {
+          "category": "FILE",
+          "pattern": "\\bUpload of (?P<value>.+?) for "
+        },
+        {
+          "category": "LOCATION",
+          "pattern": "\\bLocation:\\s*(?P<value>[^\\r\\n]+)"
+        }
+      ]
+    },
+    "foodrecall": {
+      "detect": [
+        "foodrecall",
+        "rueckrufradar",
+        "RückrufRadar",
+        "RecallEventsService"
+      ],
+      "fields": {
+        "user_trace_id": "PERSON_ID",
+        "client_session_id": "SESSION_ID",
+        "pushToken": "SECRET",
+        "fcmToken": "SECRET",
+        "apnsToken": "SECRET",
+        "subscription": "SECRET",
+        "endpoint": "URL",
+        "keywords": "CONTENT",
+        "keyword": "CONTENT",
+        "searchQuery": "CONTENT",
+        "query": "CONTENT",
+        "preferences": "CONTENT",
+        "selectedStates": "LOCATION",
+        "selectedSources": "CONTENT"
+      }
+    },
+    "abc-todo": {
+      "detect": [
+        "abc-todo",
+        "ABC-Todo",
+        "de.abctodo.app"
+      ],
+      "fields": {
+        "deviceId": "DEVICE_ID",
+        "deviceToken": "SECRET",
+        "deviceTokenPepper": "SECRET",
+        "pairingCodePepper": "SECRET",
+        "pairingCode": "SECRET",
+        "boardId": "CONTENT_ID",
+        "taskId": "CONTENT_ID",
+        "title": "CONTENT",
+        "description": "CONTENT",
+        "note": "CONTENT",
+        "notes": "CONTENT",
+        "content": "CONTENT",
+        "databaseUrl": "SECRET"
+      }
+    },
+    "triply": {
+      "detect": [
+        "triply",
+        "Triply",
+        "TripStorageService"
+      ],
+      "fields": {
+        "displayName": "PERSON",
+        "tripId": "CONTENT_ID",
+        "documentId": "CONTENT_ID",
+        "checklistId": "CONTENT_ID",
+        "destination": "LOCATION",
+        "title": "CONTENT",
+        "name": "CONTENT",
+        "notes": "CONTENT",
+        "note": "CONTENT",
+        "documents": "CONTENT",
+        "passportNumber": "PERSON_ID",
+        "bookingReference": "SECRET",
+        "startDate": "PERSONAL_DATE",
+        "endDate": "PERSONAL_DATE",
+        "departureDate": "PERSONAL_DATE",
+        "returnDate": "PERSONAL_DATE"
+      }
+    },
+    "timeflow": {
+      "detect": [
+        "timeflow",
+        "timeRevision",
+        "Urlaubsanträge",
+        "Urlaubsantrag"
+      ],
+      "fields": {
+        "employeeId": "PERSON_ID",
+        "employeeName": "PERSON",
+        "userId": "PERSON_ID",
+        "requests": "CONTENT",
+        "requestArray": "CONTENT",
+        "reason": "CONTENT",
+        "category": "CONTENT",
+        "categorie": "CONTENT",
+        "startDate": "PERSONAL_DATE",
+        "endDate": "PERSONAL_DATE",
+        "selectedStartDate": "PERSONAL_DATE",
+        "selectedEndDate": "PERSONAL_DATE"
+      },
+      "patterns": [
+        {
+          "category": "PERSONAL_DATE",
+          "pattern": "Neues Startdatum:\\s*(?P<value>[^\\r\\n]+)"
+        }
+      ]
+    },
+    "pcchangemonitor": {
+      "detect": [
+        "PcChangeMonitor",
+        "pcchangemonitor",
+        "SnapshotScan",
+        "StartupUI"
+      ],
+      "fields": {
+        "sid": "PERSON_ID",
+        "owner": "USER",
+        "registeredOwner": "PERSON",
+        "registeredOrganization": "PERSON",
+        "machineGuid": "DEVICE_ID",
+        "commandLine": "COMMAND",
+        "command": "COMMAND",
+        "sourcePath": "PATH",
+        "registryValue": "CONTENT",
+        "registryData": "CONTENT"
+      }
+    },
+    "tabtimekeeper": {
+      "detect": [
+        "tabtimekeeper",
+        "TabTimeKeeper"
+      ],
+      "fields": {
+        "url": "URL",
+        "title": "CONTENT",
+        "favIconUrl": "URL",
+        "tabId": "CONTENT_ID"
+      }
+    },
+    "better-rhythm": {
+      "detect": [
+        "BetterRhythm",
+        "better-rhythm"
+      ],
+      "fields": {
+        "windowTitle": "CONTENT",
+        "processPath": "PATH",
+        "executablePath": "PATH",
+        "foregroundApp": "CONTENT",
+        "activityHistory": "CONTENT"
+      }
+    }
+  }
+}

@@ -1,4 +1,4 @@
 interface:
   display_name: "Logdaten redigieren"
-  short_description: "Öffentliche IPs und Benutzernamen in Logs redigieren"
-  default_prompt: "Nutze $redact-log, um öffentliche IP-Adressen und Benutzernamen in dieser Logdatei zu ersetzen und eine separate Kopie zu speichern."
+  short_description: "Persönliche Logdaten entfernen, Fehleranalyse erhalten"
+  default_prompt: "Nutze $redact-log, um persönliche Daten und Zugangsdaten aus diesen Logs zu entfernen und die Fehleranalyse in einer separaten Kopie zu erhalten."
