@@ -49,8 +49,7 @@ einem Submodule nur den Commit-Verweis, nicht dessen Dateien.
 
 Derzeit keine. Der Debug-APK-Workflow von joe-todo ist mit dem Projekt nach
 [HolzfeallerJoe/joe-todo](https://github.com/HolzfeallerJoe/joe-todo)
-umgezogen; die bisherigen `joe-todo-v*`-Releases hier bleiben als Archiv
-bestehen.
+umgezogen, die bisherigen `joe-todo-v*`-Releases und -Tags ebenfalls.
 
 ## Releases
 
