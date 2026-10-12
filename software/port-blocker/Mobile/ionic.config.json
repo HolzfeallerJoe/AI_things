@@ -1,7 +1,0 @@
-{
-  "name": "port-blocker",
-  "integrations": {
-    "capacitor": {}
-  },
-  "type": "angular"
-}

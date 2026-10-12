@@ -1,9 +1,13 @@
 # Workflows
 
-Dieses Repo ist eine Sammlung unabhaengiger Projekte (`software/*`,
-`wrapper/*`, `skills/*`). GitHub Actions kennt aber nur ein
-`.github/workflows/` fuer das ganze Repo, also muss jeder Workflow selbst
-dafuer sorgen, dass er nicht bei fremden Aenderungen mitlaeuft.
+Dieses Repo ist eine Sammlung unabhaengiger Projekte (`wrapper/*`,
+`skills/*`). GitHub Actions kennt aber nur ein `.github/workflows/` fuer das
+ganze Repo, also muss jeder Workflow selbst dafuer sorgen, dass er nicht bei
+fremden Aenderungen mitlaeuft.
+
+Die Projekte unter `software/*` sind Git-Submodules mit eigenem Repo. Ihre
+Workflows liegen dort, nicht hier – ein Workflow in diesem Repo sieht von
+einem Submodule nur den Commit-Verweis, nicht dessen Dateien.
 
 ## Regeln
 
@@ -18,11 +22,11 @@ dafuer sorgen, dass er nicht bei fremden Aenderungen mitlaeuft.
      push:
        branches: [main]
        paths:
-         - 'software/mein-projekt/**'
+         - 'wrapper/mein-projekt/**'
          - '.github/workflows/mein-projekt-build.yml'
      pull_request:
        paths:
-         - 'software/mein-projekt/**'
+         - 'wrapper/mein-projekt/**'
          - '.github/workflows/mein-projekt-build.yml'
    ```
 
@@ -43,9 +47,10 @@ dafuer sorgen, dass er nicht bei fremden Aenderungen mitlaeuft.
 
 ## Vorhandene Workflows
 
-| Datei | Projekt | Was es tut |
-| --- | --- | --- |
-| `joe-todo-apk.yml` | `software/joe-todo` | Analyse, Unit-Tests, Debug-APK als Artefakt und als Release `joe-todo-v<version>` |
+Derzeit keine. Der Debug-APK-Workflow von joe-todo ist mit dem Projekt nach
+[HolzfeallerJoe/joe-todo](https://github.com/HolzfeallerJoe/joe-todo)
+umgezogen; die bisherigen `joe-todo-v*`-Releases hier bleiben als Archiv
+bestehen.
 
 ## Releases
 

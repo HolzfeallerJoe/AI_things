@@ -1,0 +1,39 @@
+[submodule "software/anti-youtube"]
+	path = software/anti-youtube
+	url = https://github.com/HolzfeallerJoe/anti-youtube.git
+[submodule "software/jira_wrapper_desktop_app"]
+	path = software/jira_wrapper_desktop_app
+	url = https://github.com/HolzfeallerJoe/jira_wrapper_desktop_app.git
+[submodule "software/joe-todo"]
+	path = software/joe-todo
+	url = https://github.com/HolzfeallerJoe/joe-todo.git
+[submodule "software/json-search"]
+	path = software/json-search
+	url = https://github.com/HolzfeallerJoe/json-search.git
+[submodule "software/kickstarter"]
+	path = software/kickstarter
+	url = https://github.com/HolzfeallerJoe/kickstarter.git
+[submodule "software/model-benchmark"]
+	path = software/model-benchmark
+	url = https://github.com/HolzfeallerJoe/model-benchmark.git
+[submodule "software/obs-spotify"]
+	path = software/obs-spotify
+	url = https://github.com/HolzfeallerJoe/obs-spotify.git
+[submodule "software/oracle-retry"]
+	path = software/oracle-retry
+	url = https://github.com/HolzfeallerJoe/oracle-retry.git
+[submodule "software/overtime-overview"]
+	path = software/overtime-overview
+	url = https://github.com/HolzfeallerJoe/overtime-overview.git
+[submodule "software/port-blocker"]
+	path = software/port-blocker
+	url = https://github.com/HolzfeallerJoe/port-blocker.git
+[submodule "software/rss-feed-filter"]
+	path = software/rss-feed-filter
+	url = https://github.com/HolzfeallerJoe/rss-feed-filter.git
+[submodule "software/spotify-artist-tracks"]
+	path = software/spotify-artist-tracks
+	url = https://github.com/HolzfeallerJoe/spotify-artist-tracks.git
+[submodule "software/steam_points_shop_search"]
+	path = software/steam_points_shop_search
+	url = https://github.com/HolzfeallerJoe/steam_points_shop_search.git

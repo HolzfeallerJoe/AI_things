@@ -1,2 +1,0 @@
-flask>=3.0
-winsdk>=1.0
