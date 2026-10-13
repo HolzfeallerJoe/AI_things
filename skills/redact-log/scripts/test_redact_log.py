@@ -113,6 +113,104 @@ class RedactionTests(unittest.TestCase):
         self.assertEqual(json.loads(shifted[1])['elapsedMs'],2500)
         self.assertEqual(rl.shift_timestamps(shifted),shifted)
 
+    def test_updater_release_is_not_an_email(self):
+        source = ('[YtDlpChannel] Updated yt-dlp to nightly@2026.10.08.235100 from yt-dlp/yt-dlp-nightly-builds\n'
+                  'Current version: stable@2026.08.19\nContact alice@example.net\n')
+        result = self.clean(source, 'media')
+        self.assertIn('nightly@2026.10.08.235100', result)
+        self.assertIn('stable@2026.08.19', result)
+        self.assertNotIn('alice@example.net', result)
+        self.assertIn('Contact [REDACTED_EMAIL_', result)
+
+    def test_media_urls_keep_query_structure_and_source_identity(self):
+        source = json.dumps({
+            'id': 'AbCdEfGhI12', 'title': 'Private listening selection',
+            'webpage_url': 'https://www.youtube.com/watch?v=AbCdEfGhI12',
+            'url': 'https://rr1.googlevideo.com/videoplayback?expire=1791468000&ei=sessionOne&ip=8.8.4.4&sig=secretOne&itag=251&dur=42.0&clen=43469981',
+            'http_headers': {'Authorization': 'Bearer personalAccess', 'User-Agent': 'Mozilla/5.0'},
+            'errorCode': 'HTTP_403', 'status': 403, 'acodec': 'opus'
+        })
+        result = self.clean(source, 'media')
+        parsed = json.loads(result)
+        self.assertEqual(parsed['id'], 'AbCdEfGhI12')
+        self.assertEqual(parsed['webpage_url'], 'https://www.youtube.com/watch?v=AbCdEfGhI12')
+        query = rl.parse_qs(rl.urlsplit(parsed['url']).query)
+        self.assertEqual(set(query), {'expire', 'ei', 'ip', 'sig', 'itag', 'dur', 'clen'})
+        self.assertEqual(query['expire'], ['1791468000'])
+        self.assertEqual(query['itag'], ['251'])
+        self.assertEqual(query['dur'], ['42.0'])
+        self.assertEqual(query['clen'], ['43469981'])
+        self.assertEqual(parsed['status'], 403)
+        self.assertEqual(parsed['http_headers']['User-Agent'], 'Mozilla/5.0')
+        for value in ['Private listening selection', 'sessionOne', '8.8.4.4', 'secretOne', 'personalAccess']:
+            self.assertNotIn(value, result)
+
+    def test_relative_media_queries_keep_retry_correlations(self):
+        first = 'videoplayback?expire=1791468000&ei=sessionOne&sig=secretOne&itag=251&dur=42.0'
+        second = first.replace('secretOne', 'secretTwo')
+        source = f'ERROR: [generic] {first}\nretry: {first}\nrefreshed: {second}\n'
+        result = self.clean(source, 'media')
+        queries = [line.split('videoplayback?', 1)[1] for line in result.splitlines()]
+        self.assertEqual(queries[0], queries[1])
+        self.assertNotEqual(queries[0], queries[2])
+        for query in queries:
+            self.assertEqual(set(rl.parse_qs(query)), {'expire', 'ei', 'sig', 'itag', 'dur'})
+            self.assertIn('itag=251&dur=42.0', query)
+        for value in ['sessionOne', 'secretOne', 'secretTwo']:
+            self.assertNotIn(value, result)
+
+    def test_source_id_preservation_is_scoped_and_optional(self):
+        for url in ['https://youtu.be/AbCdEfGhI12', 'https://www.youtube.com/shorts/AbCdEfGhI12',
+                    'https://www.youtube.com/embed/AbCdEfGhI12', 'https://www.youtube.com/live/AbCdEfGhI12']:
+            with self.subTest(url=url):
+                result = self.clean(url, 'media')
+                self.assertEqual(result, url)
+                strict = rl.Redactor(['media'], redact_media_ids=True).transform(url)
+                self.assertNotIn('AbCdEfGhI12', strict)
+                self.assertEqual(rl.Redactor(['media'], redact_media_ids=True).transform(strict), strict)
+        unrelated = self.clean('https://private.example.net/watch?v=AbCdEfGhI12', 'media')
+        self.assertNotIn('AbCdEfGhI12', unrelated)
+        self.assertNotIn('private.example.net', unrelated)
+        self.assertNotIn('AbCdEfGhI12', self.clean('{"id":"AbCdEfGhI12"}', 'media'))
+
+    def test_cli_preserves_dates_by_default_and_shifts_expiry_only_on_request(self):
+        source = ('2026-10-08T10:00:00Z request\r\n'
+                  'https://www.youtube.com/watch?v=AbCdEfGhI12\r\n'
+                  'https://rr1.googlevideo.com/videoplayback?expire=1791460800&sig=secretOne&itag=251\r\n'
+                  '{"timestamp":1791453600000,"birthDate":"1990-02-03"}\r\n')
+        with tempfile.TemporaryDirectory() as folder:
+            original = Path(folder) / 'app.log'
+            original.write_bytes(source.encode())
+            for flags, shifted in [([], False), (['--keep-timestamps'], False), (['--shift-timestamps'], True)]:
+                output = Path(folder) / ('output' + str(len(flags)) + str(shifted) + '.log')
+                stdout = io.StringIO()
+                with contextlib.redirect_stdout(stdout), contextlib.redirect_stderr(io.StringIO()):
+                    self.assertEqual(rl.main([str(original), '--output', str(output), '--product', 'media', *flags]), 0)
+                    self.assertEqual(rl.main([str(output), '--check', '--product', 'media']), 0)
+                result = output.read_bytes().decode()
+                report = json.loads(stdout.getvalue().splitlines()[0])
+                self.assertEqual(report['timeline_shifted'], shifted)
+                self.assertTrue(report['media_source_ids_preserved'])
+                self.assertEqual(result.count('\r\n'), source.count('\r\n'))
+                self.assertNotIn('1990-02-03', result)
+                self.assertNotIn('secretOne', result)
+                if shifted:
+                    event = rl.parse_timestamp(rl.TIMESTAMP.search(result)[0]).timestamp()
+                    expiry = int(re.search(r'expire=(\d+)', result)[1])
+                    epoch_ms = json.loads(result.splitlines()[3])['timestamp']
+                    self.assertEqual(expiry - event, 7200)
+                    self.assertEqual(epoch_ms, int(event * 1000))
+                else:
+                    self.assertIn('2026-10-08T10:00:00Z', result)
+                    self.assertIn('expire=1791460800', result)
+                    self.assertIn('1791453600000', result)
+            strict_output = Path(folder) / 'strict.log'
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(rl.main([str(original), '--output', str(strict_output), '--product', 'media', '--redact-media-ids']), 0)
+                self.assertEqual(rl.main([str(strict_output), '--check', '--product', 'media', '--redact-media-ids']), 0)
+            self.assertNotIn('AbCdEfGhI12', strict_output.read_text())
+            self.assertEqual(original.read_bytes(), source.encode())
+
     def test_profile_hint_and_shared_ids(self):
         source='sessionId=01234567-89ab-cdef-0123-456789abcdef\nagain 01234567-89ab-cdef-0123-456789abcdef\n'
         r=rl.Redactor();result=r.transform(source,'foodrecall-client.log')
@@ -160,6 +258,19 @@ class RedactionTests(unittest.TestCase):
                     self.assertEqual(rl.main([str(first),'--output',str(first)]),2)
                 self.assertEqual(first.read_bytes(),data)
                 self.assertEqual(second.read_bytes(),data)
+
+    def test_source_identity_remains_correlated_across_batch_files(self):
+        with tempfile.TemporaryDirectory() as folder:
+            metadata = Path(folder) / 'metadata.log'
+            source = Path(folder) / 'source.log'
+            metadata.write_text('{"id":"AbCdEfGhI12","videoId":"AbCdEfGhI12","status":403}\n')
+            source.write_text('https://www.youtube.com/watch?v=AbCdEfGhI12\n')
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(rl.main([str(metadata), str(source), '--product', 'media']), 0)
+                outputs = [str(path.with_name(path.stem + '.redacted.log')) for path in [metadata, source]]
+                self.assertEqual(rl.main([*outputs, '--check', '--product', 'media']), 0)
+            self.assertEqual(json.loads(Path(outputs[0]).read_text())['id'], 'AbCdEfGhI12')
+            self.assertEqual(Path(outputs[1]).read_text(), source.read_text())
 
 if __name__=='__main__':
     unittest.main()

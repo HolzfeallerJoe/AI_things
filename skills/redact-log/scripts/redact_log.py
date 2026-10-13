@@ -9,11 +9,13 @@ import sys
 from collections import Counter
 from datetime import datetime, timezone
 from pathlib import Path
-from urllib.parse import unquote
+from urllib.parse import unquote, urlsplit, parse_qs
 
 RULES_FILE = Path(__file__).resolve().parents[1] / 'references' / 'product-rules.json'
 PLACEHOLDER = re.compile(r'(?:\[(?:REDACTED[^\]\r\n]*|USER|IP|URL|PATH|TOKEN)\]|<(?:Redacted|Anonymized)[^>\r\n]*>)', re.I)
 EMAIL = re.compile(r'(?<![\w.+-])[\w.!#$%&\x27*+/=?^`{|}~-]+@[\w-]+(?:\.[\w-]+)+(?![\w.-])')
+# yt-dlp's updater prints channel@date.build, which resembles an email.
+YTDLP_RELEASE = re.compile(r'(?:stable|nightly|master)@\d{4}\.\d{2}\.\d{2}(?:\.\d+)?')
 IPV4 = re.compile(r'(?<![\w.])(?:\d{1,3}\.){3}\d{1,3}(?![\w.])')
 IPV6 = re.compile(r'(?<![\w:])(?:[0-9a-f]*:){2,}[0-9a-f:.]*(?:%[\w.-]+)?(?![\w:])', re.I)
 ENCODED_IP = re.compile(r'(?<!\w)(?:[0-9a-f]+|%3a|%2e)(?:[0-9a-f]|%3a|%2e|[:.])*(?!\w)', re.I)
@@ -26,6 +28,7 @@ IBAN = re.compile(r'(?<!\w)[A-Z]{2}\d{2}(?: ?[A-Z0-9]){11,30}(?!\w)')
 CARD = re.compile(r'(?<![\w.])(?:\d[ -]?){12,18}\d(?![\w.])')
 VERSION_PREFIX = re.compile(r'(?:\b[\w-]*version|\brelease|\bbuild)["\x27]?\s*[:=]\s*["\x27]?$', re.I)
 URL = re.compile(r'\b(?:https?|wss?|ftp|file|capacitor|content)://[^\s"\x27<>,;{}()]+', re.I)
+MEDIA_QUERY = re.compile(r'\bvideoplayback\?[^\s"\x27<>,{}()]+', re.I)
 WINDOWS_PATH = re.compile(r'(?i)\b[a-z](?::|%3a)(?:\\+|/|%5c)[^\r\n"\x27<>|]*')
 POSIX_PATH = re.compile(r'(?<![\w:])/(?:Users|home|storage|sdcard|data/user|tmp|mnt)/[^\r\n"\x27<>|]*')
 FIELD = re.compile(r'(?<![\w:-])(?P<key>"(?:\\.|[^"\\\r\n])*"|\x27[^\x27\r\n]*\x27|[A-Za-z_][\w.-]{0,65})(?P<sep>\s*[:=]\s*)')
@@ -36,6 +39,27 @@ def normalize(key):
 
 def words(value):
     return value.split()
+
+def youtube_video_id(value):
+    """Recognize source identity syntactically, without requesting the URL."""
+    try:
+        parsed = urlsplit(value)
+        host = (parsed.hostname or '').lower()
+        if parsed.scheme.lower() not in {'http', 'https'} or parsed.username is not None:
+            return None
+        if host == 'youtu.be':
+            video = unquote(parsed.path.strip('/'))
+        elif host == 'youtube.com' or host.endswith('.youtube.com'):
+            if parsed.path == '/watch':
+                video = parse_qs(parsed.query).get('v', [''])[0]
+            else:
+                match = re.fullmatch(r'/(?:shorts|embed|live)/([^/]+)/?', parsed.path)
+                video = unquote(match[1]) if match else ''
+        else:
+            return None
+        return video if re.fullmatch(r'[A-Za-z0-9_-]{11}', video) else None
+    except ValueError:
+        return None
 
 GENERAL_FIELDS = {}
 for category, names in {
@@ -118,7 +142,7 @@ def load_rules(extra=None):
     return rules
 
 class Redactor:
-    def __init__(self, profiles=(), rules=None, usernames=(), values=()):
+    def __init__(self, profiles=(), rules=None, usernames=(), values=(), redact_media_ids=False):
         self.rules = rules or load_rules()
         unknown = set(profiles) - self.rules['profiles'].keys() - {'auto'}
         if unknown:
@@ -132,6 +156,8 @@ class Redactor:
         self.active_profiles = set()
         self.current_profiles = set()
         self.patterns = []
+        self.redact_media_ids = redact_media_ids
+        self.media_ids = set()
         for value in usernames:
             self.learn('USER', value)
         for item in values:
@@ -203,6 +229,8 @@ class Redactor:
         if value is None or isinstance(value, bool) or value == '' or is_placeholder(value):
             return value
         if category!='SECRET' and isinstance(value,str) and value.lower() in {'null','undefined','none'}:
+            return value
+        if category == 'CONTENT_ID' and not self.redact_media_ids and str(value) in self.media_ids:
             return value
         if category in {'CONTENT', 'DEVICE_NAME'} and isinstance(value, str) and value.casefold() in PUBLIC_NAMES:
             return value
@@ -285,6 +313,9 @@ class Redactor:
         if not m:
             return self.alias('URL', value)
         scheme, host, path, query, fragment = (m.group(k) or '' for k in ['scheme','host','path','query','frag'])
+        video_id = youtube_video_id(value) if 'media' in self.current_profiles and not self.redact_media_ids else None
+        if video_id:
+            self.media_ids.add(video_id)
         if '@' in host:
             credentials, host = host.rsplit('@', 1)
             host = self.alias('SECRET', credentials) + '@' + host
@@ -309,9 +340,11 @@ class Redactor:
                 if token_next:
                     segments[i] = self.alias('SECRET', part)
                     token_next = False
+                elif video_id and unquote(part) == video_id:
+                    pass
                 elif part.casefold() in {'box','f','u','z','invite','share'} and 'sendme' in self.current_profiles:
                     token_next = True
-                elif part.casefold() not in SAFE_SEGMENTS and not re.fullmatch(r'(?:voice2mail3?\.php|videoplayback|watch|shorts|embed|channel|playlist|search|favicon\.ico)', part, re.I):
+                elif part.casefold() not in SAFE_SEGMENTS and not re.fullmatch(r'(?:voice2mail3?\.php|videoplayback|watch|shorts|embed|live|channel|playlist|search|favicon\.ico)', part, re.I):
                     # Preserve source module paths, otherwise hide user-selected resource segments.
                     if not re.search(r'\.(?:js|css|map|wasm)$', part, re.I):
                         segments[i] = self.alias('URL_PATH', part)
@@ -326,6 +359,8 @@ class Redactor:
                 category = self.field_category(unquote(key))
                 if n in {'ip','clientip','remoteip'}:
                     val = self.ip(unquote(val))
+                elif video_id and n == 'v' and unquote(val) == video_id:
+                    pass
                 elif category:
                     val = str(self.scalar(category, unquote(val)))
                 elif n in {'v','id','videoid','channelid'} and 'media' in self.current_profiles:
@@ -380,8 +415,16 @@ class Redactor:
     def assignments(self, text):
         edits = []
         occupied = 0
+        # Query values are handled by url(), never by free-text field parsing.
+        # Otherwise sig=secret&itag=251&dur=42 would become one secret alias.
+        url_spans = sorted([m.span() for pattern in (URL, MEDIA_QUERY) for m in pattern.finditer(text)])
+        url_index = 0
         for m in FIELD.finditer(text):
             if m.start() < occupied:
+                continue
+            while url_index < len(url_spans) and url_spans[url_index][1] <= m.start():
+                url_index += 1
+            if url_index < len(url_spans) and url_spans[url_index][0] <= m.start() < url_spans[url_index][1]:
                 continue
             raw_key = m['key']
             try:
@@ -478,6 +521,8 @@ class Redactor:
         text = re.sub(r'(?im)(\b(?:Authorization|Proxy-Authorization)\s*:\s*(?:Bearer|Basic)\s+)([^\s,;]+)', lambda m: m[1]+self.alias('SECRET', m[2]), text)
         text = JWT.sub(lambda m: self.alias('SECRET', m[0]), text)
         text = URL.sub(lambda m: self.url(m[0]), text)
+        # yt-dlp error lines often omit the host and print just videoplayback?...
+        text = MEDIA_QUERY.sub(lambda m: self.url('https://googlevideo.com/' + m[0])[len('https://googlevideo.com/'):], text)
         def redact_path(m):
             original = m[0]
             end = re.search(r'\s+(?:to\s+(?=[a-zA-Z]:)|from\s+(?=[a-zA-Z]:)|Error:|ENOENT\b|ENOTDIR\b|EACCES\b|at\s)|[,;]\s*\w+\s*=', original)
@@ -485,7 +530,7 @@ class Redactor:
             return self.path(head) + original[len(head):]
         text = WINDOWS_PATH.sub(redact_path, text)
         text = POSIX_PATH.sub(redact_path, text)
-        text = EMAIL.sub(lambda m: self.scalar('EMAIL', m[0]), text)
+        text = EMAIL.sub(lambda m: m[0] if YTDLP_RELEASE.fullmatch(m[0]) else self.scalar('EMAIL', m[0]), text)
         for pattern, encoded in ((ENCODED_IP, True), (IPV6, False), (IPV4, False)):
             original = text
             def replace_ip(m):
@@ -520,6 +565,8 @@ class Redactor:
 
     def transform(self, text, hint=''):
         self.activate(text,hint)
+        if 'media' in self.current_profiles and not self.redact_media_ids:
+            self.media_ids.update(video for m in URL.finditer(text) if (video := youtube_video_id(m[0])))
         # First pass learns contextual identities; second propagates them to earlier lines.
         result = self.scrub(text, detect=False)
         return self.scrub(result, detect=False)
@@ -582,7 +629,10 @@ def main(argv=None):
     parser.add_argument('--product', action='append', default=[], help='Product profile; default auto')
     parser.add_argument('--rules', type=Path, help='Extra local JSON field rules')
     parser.add_argument('--check', action='store_true', help='Scan without writing; zero is not a full privacy review')
-    parser.add_argument('--keep-timestamps', action='store_true', help='Keep exact event timestamps instead of shifting the batch timeline')
+    timing = parser.add_mutually_exclusive_group()
+    timing.add_argument('--keep-timestamps', action='store_true', help='Keep exact technical event timestamps (the default; retained for compatibility)')
+    timing.add_argument('--shift-timestamps', action='store_true', help='Shift event and URL expiry timestamps together for stricter sharing privacy')
+    parser.add_argument('--redact-media-ids', action='store_true', help='Alias YouTube source video IDs as private usage information; default preserves reproduction URLs in media logs')
     parser.add_argument('--list-products', action='store_true')
     args = parser.parse_args(argv)
     if sys.version_info < (3,13):
@@ -600,7 +650,7 @@ def main(argv=None):
         if len(set(sources)) != len(sources):
             raise ValueError('Duplicate input files.')
         contents = [decode(p.read_bytes(), args.encoding) for p in sources]
-        redactor = Redactor(args.product, rules, args.username, args.value)
+        redactor = Redactor(args.product, rules, args.username, args.value, args.redact_media_ids)
         # Learn across the whole batch; maps stay in memory only.
         for source,(text, _, _) in zip(sources,contents):
             redactor.transform(text,str(source))
@@ -614,19 +664,23 @@ def main(argv=None):
         if len(set(destinations)) != len(destinations) or any(p in sources or p.exists() for p in destinations):
             raise ValueError('Outputs must be unique new files, separate from all inputs.')
         # Check before writing anything. No raw mappings or snippets leave this process.
+        verify = Redactor(args.product, rules, redact_media_ids=args.redact_media_ids)
+        # A metadata record may be in one file and its source URL in another.
         for source,result in zip(sources,results):
-            verify = Redactor(args.product, rules)
+            verify.transform(result,str(source))
+        for source,result in zip(sources,results):
             if verify.transform(result,str(source)) != result:
                 raise ValueError('Residual redaction matches found; no output was written.')
         payloads = [bom+result.encode(encoding) for result, (_,encoding,bom) in zip(results,contents)]
-        if not args.keep_timestamps:
+        if args.shift_timestamps:
             results=shift_timestamps(results)
             payloads=[bom+result.encode(encoding) for result,(_,encoding,bom) in zip(results,contents)]
         for destination, payload in zip(destinations,payloads):
             with destination.open('xb') as output:
                 output.write(payload)
         print(json.dumps({'outputs':list(map(str,destinations)), 'replacements':dict(redactor.counts),
-                          'profiles':sorted(redactor.active_profiles), 'timeline_shifted':not args.keep_timestamps,
+                          'profiles':sorted(redactor.active_profiles), 'timeline_shifted':args.shift_timestamps,
+                          'media_source_ids_preserved':not args.redact_media_ids and 'media' in redactor.active_profiles,
                           'manual_review_required':True}, ensure_ascii=True))
         return 0
     except UnicodeError:
