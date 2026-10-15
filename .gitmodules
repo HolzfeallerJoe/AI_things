@@ -37,3 +37,6 @@
 [submodule "software/steam_points_shop_search"]
 	path = software/steam_points_shop_search
 	url = https://github.com/HolzfeallerJoe/steam_points_shop_search.git
+[submodule "software/urban-train"]
+	path = software/urban-train
+	url = https://github.com/HolzfeallerJoe/urban-train.git
