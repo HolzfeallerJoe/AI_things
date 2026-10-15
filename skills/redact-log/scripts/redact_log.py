@@ -31,8 +31,13 @@ URL = re.compile(r'\b(?:https?|wss?|ftp|file|capacitor|content)://[^\s"\x27<>,;{
 MEDIA_QUERY = re.compile(r'\bvideoplayback\?[^\s"\x27<>,{}()]+', re.I)
 WINDOWS_PATH = re.compile(r'(?i)\b[a-z](?::|%3a)(?:\\+|/|%5c)[^\r\n"\x27<>|]*')
 POSIX_PATH = re.compile(r'(?<![\w:])/(?:Users|home|storage|sdcard|data/user|tmp|mnt)/[^\r\n"\x27<>|]*')
-FIELD = re.compile(r'(?<![\w:-])(?P<key>"(?:\\.|[^"\\\r\n])*"|\x27[^\x27\r\n]*\x27|[A-Za-z_][\w.-]{0,65})(?P<sep>\s*[:=]\s*)')
+FIELD = re.compile(r'(?<![\w:-])(?P<key>"(?:\\.|[^"\\\r\n])*"|\x27[^\x27\r\n]*\x27|(?i:Install[ \t]+mode[ \t]+root[ \t]+key)|[A-Za-z_][\w.-]{0,65})(?P<sep>\s*[:=]\s*)')
 DECODER = json.JSONDecoder()
+# These names also occur as roles, labels and ordinary words in diagnostic prose.
+AMBIGUOUS_USERNAMES = {'user', 'admin', 'administrator', 'guest', 'root', 'system', 'default', 'public'}
+REGISTRY_ROOTS = {'HKEY_CLASSES_ROOT', 'HKEY_CURRENT_USER', 'HKEY_LOCAL_MACHINE',
+                  'HKEY_USERS', 'HKEY_CURRENT_CONFIG', 'HKEY_PERFORMANCE_DATA',
+                  'HKCR', 'HKCU', 'HKLM', 'HKU', 'HKCC', 'HKPD'}
 
 def normalize(key):
     return re.sub(r'[^a-z0-9]', '', key.lower())
@@ -159,14 +164,14 @@ class Redactor:
         self.redact_media_ids = redact_media_ids
         self.media_ids = set()
         for value in usernames:
-            self.learn('USER', value)
+            self.learn('USER', value, explicit=True)
         for item in values:
             if '=' not in item:
                 raise ValueError('--value requires CATEGORY=value.')
             category, value = item.split('=', 1)
             if not re.fullmatch(r'[A-Z][A-Z0-9_]{0,30}', category):
                 raise ValueError('Invalid --value category.')
-            self.learn(category, value)
+            self.learn(category, value, explicit=True)
 
     def activate(self, text, hint=''):
         chosen = set(self.profiles) - {'auto'}
@@ -199,7 +204,11 @@ class Redactor:
         self.counts[category] += 1
         return self.mapping[key]
 
-    def learn(self, category, value):
+    def learn(self, category, value, explicit=False):
+        # Still redact these account names in paths and labeled identity fields.
+        # Only an explicit literal override propagates them into unrelated prose.
+        if category == 'USER' and not explicit and value.casefold() in AMBIGUOUS_USERNAMES:
+            return
         if isinstance(value, str) and len(value) >= 4 and not PLACEHOLDER.search(value):
             self.learned.setdefault(value, category)
 
@@ -219,6 +228,8 @@ class Redactor:
         n = normalize(key)
         if n in self.fields:
             return self.fields[n]
+        if n in {'installmoderootkey', 'registryroot', 'registryrootkey'}:
+            return 'REGISTRY_ROOT'
         if n not in TECHNICAL_FIELDS and (n.endswith('token') or n.endswith('secret') or n.endswith('password')):
             return 'SECRET'
         if n.endswith('email') or n.endswith('emailaddress'):
@@ -228,6 +239,10 @@ class Redactor:
     def scalar(self, category, value):
         if value is None or isinstance(value, bool) or value == '' or is_placeholder(value):
             return value
+        if category == 'REGISTRY_ROOT':
+            if isinstance(value, str) and value.upper() in REGISTRY_ROOTS:
+                return value
+            category = 'SECRET'  # Unknown values and subkey paths are not allowlisted.
         if category!='SECRET' and isinstance(value,str) and value.lower() in {'null','undefined','none'}:
             return value
         if category == 'CONTENT_ID' and not self.redact_media_ids and str(value) in self.media_ids:

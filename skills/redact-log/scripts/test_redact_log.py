@@ -11,6 +11,57 @@ from pathlib import Path
 import redact_log as rl
 
 class RedactionTests(unittest.TestCase):
+    def test_installer_preserves_root_and_generic_user_prose(self):
+        source = ('2026-10-01 12:00:00.000 User privileges: Administrative\r\n'
+                  'Install mode root key: HKEY_LOCAL_MACHINE\r\n'
+                  '64-bit install mode: No\r\n'
+                  'C:\\Users\\User\\Downloads\\private-installer.exe\r\n'
+                  'username=User\r\n'
+                  'User chose OK.\r\n'
+                  'InitializeSetup raised an exception (fatal).\r\n'
+                  'Runtime error (at 151:213):\r\nUnbekannte Eigenschaft.\r\n')
+        redactor = rl.Redactor(['media', 'x-core'])
+        result = redactor.transform(source)
+        for evidence in ['User privileges: Administrative', 'User chose OK.',
+                         'Install mode root key: HKEY_LOCAL_MACHINE', '64-bit install mode: No',
+                         '2026-10-01 12:00:00.000', 'InitializeSetup raised an exception (fatal).',
+                         'Runtime error (at 151:213):', 'Unbekannte Eigenschaft.']:
+            self.assertIn(evidence, result)
+        self.assertIn('C:\\Users\\[REDACTED_USER_001]\\Downloads\\', result)
+        self.assertIn('username=[REDACTED_USER_001]', result)
+        self.assertNotIn('private-installer', result)
+        self.assertNotIn('SECRET', result)
+        self.assertEqual(source.count('\r\n'), result.count('\r\n'))
+        self.assertEqual(rl.Redactor(['media', 'x-core']).transform(result), result)
+
+    def test_registry_constants_require_registry_context(self):
+        for root in sorted(rl.REGISTRY_ROOTS):
+            with self.subTest(root=root):
+                source = f'Install mode root key: {root}\n' + json.dumps({'registryRoot': root})
+                self.assertEqual(self.clean(source), source)
+        for field in ['key', 'apiKey', 'password', 'token']:
+            result = self.clean(json.dumps({field: 'HKEY_LOCAL_MACHINE'}))
+            self.assertNotIn('HKEY_LOCAL_MACHINE', result)
+            self.assertIn('[REDACTED_SECRET_', result)
+        for value in ['privateCredential', 'HKEY_LOCAL_MACHINE-private',
+                      r'HKEY_CURRENT_USER\Software\PrivateAccount']:
+            result = self.clean(f'Install mode root key: {value}\n')
+            self.assertNotIn(value, result)
+            self.assertIn('[REDACTED_SECRET_', result)
+
+    def test_ambiguous_accounts_remain_contextual_with_explicit_override(self):
+        for name in ['User', 'Admin', 'Administrator', 'Guest', 'Root', 'System', 'Default', 'Public']:
+            with self.subTest(name=name):
+                source = f'{name} action completed.\nC:\\Users\\{name}\\Documents\\private.txt\n' + json.dumps({'username': name})
+                result = self.clean(source)
+                self.assertIn(f'{name} action completed.', result)
+                self.assertNotIn(f'Users\\{name}\\', result)
+                self.assertEqual(json.loads(result.splitlines()[-1])['username'], '[REDACTED_USER_001]')
+                explicit = rl.Redactor(['general'], usernames=[name]).transform(source)
+                self.assertNotIn(f'{name} action completed.', explicit)
+        result = rl.Redactor(['general'], values=['USER=User']).transform('User action completed.')
+        self.assertEqual(result, '[REDACTED_USER_001] action completed.')
+
     def clean(self, source, product='general'):
         redactor = rl.Redactor([product])
         result = redactor.transform(source)

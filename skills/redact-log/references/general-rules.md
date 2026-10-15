@@ -11,6 +11,10 @@
 
 The script handles labeled values, common formats, nested JSON and JSON stored inside strings. Unlabeled names, local-format phone numbers, natural-language addresses, raw binary content and arbitrary pasted messages require contextual review. Partially masked values such as purchase-ID tails can still correlate a user; replace the remaining value rather than retaining the suffix.
 
+Common account names such as `User`, `Admin`, `Guest` and `System` also occur as role labels and ordinary words. Redact them in account paths and labeled identity fields, but do not automatically propagate them into unrelated prose. For example, keep `User privileges: Administrative` and `User chose OK.` even when a path contains `C:\Users\User\`. Review ambiguous prose in context; `--username` or `--value USER=...` explicitly requests literal propagation when those occurrences really identify the account. Distinctive learned names still propagate across the batch.
+
+Registry root constants are diagnostic metadata. Preserve exact predefined roots such as `HKEY_LOCAL_MACHINE`, `HKEY_CURRENT_USER`, `HKLM` and `HKCU` in `Install mode root key`, `registryRoot` and `registryRootKey` fields. Do not interpret the final word `key` in that installer label as a credential field. This exception does not allow arbitrary registry subkeys, private registry data, or values in actual credential fields such as `key`, `apiKey` or `token`.
+
 ## Preserve the failure evidence
 
 Keep log level, scope, event names, startup/shutdown markers, version/build/platform, locale/language, exception class, symbolic and HTTP error codes, retry state, queue/progress counters, sizes, speeds, durations, timeout values, MIME/codec/format, ports, protocol, relevant flags and stack-frame source filenames/line numbers. Keep object/array structure and item counts when practicable. Never truncate entire logs or discard failing records simply to remove one private field.
