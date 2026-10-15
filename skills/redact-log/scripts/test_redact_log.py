@@ -11,6 +11,59 @@ from pathlib import Path
 import redact_log as rl
 
 class RedactionTests(unittest.TestCase):
+    def test_ansi_fields_match_plain_text_redaction(self):
+        for source in [
+            '\x1b[31mpassword\x1b[0m=syntheticSecret, status=500\r\n',
+            'pass\x1b[1mword\x1b[0m=syntheticSecret, status=500\r\n',
+            'password=\x1b[38;2;255;0;0msyntheticSecret\x1b[0m, status=500\r\n',
+            'password=\x1b[31m"syntheticSecret"\x1b[0m, status=500\r\n',
+            '\x1b[2K{"\x1b[31mpassword\x1b[0m":"syntheticSecret","status":500}\r\n',
+        ]:
+            with self.subTest(source=repr(source)):
+                plain = rl.ANSI_ESCAPE.sub('', source)
+                result = self.clean(source)
+                self.assertEqual(result, self.clean(plain))
+                self.assertNotIn('syntheticSecret', result)
+                self.assertNotIn('\x1b', result)
+                self.assertIn('500', result)
+                self.assertEqual(result.count('\r\n'), source.count('\r\n'))
+
+    def test_ansi_urls_preserve_query_and_media_identity(self):
+        source = ('\x1b[31mhttps://www.youtube.com/watch?v=AbCdEfGhI12\x1b[0m\r\n'
+                  '\x1b[31mhttps://rr1.googlevideo.com/videoplayback?sig=syntheticSecret&itag=251&dur=42\x1b[0m\r\n'
+                  'url=\x1b[31mhttps://example.net/?token=syntheticSecret\x1b[0m\r\n'
+                  '\x1b[31mvideoplayback?sig=syntheticSecret&itag=251\x1b[0m\r\n')
+        result = self.clean(source, 'media')
+        self.assertEqual(result, self.clean(rl.ANSI_ESCAPE.sub('', source), 'media'))
+        self.assertNotIn('syntheticSecret', result)
+        self.assertNotIn('\x1b', result)
+        self.assertIn('watch?v=AbCdEfGhI12', result)
+        self.assertIn('itag=251&dur=42', result)
+        self.assertEqual(result.count('[REDACTED_SECRET_001]'), 3)
+
+    def test_ansi_embedded_json_and_terminal_hyperlinks(self):
+        inner = '{"\x1b[31mpassword\x1b[0m":"syntheticSecret","status":500}'
+        result = self.clean(json.dumps({'message': inner}))
+        parsed = json.loads(json.loads(result)['message'])
+        self.assertEqual(parsed['status'], 500)
+        self.assertEqual(parsed['password'], '[REDACTED_SECRET_001]')
+        for terminator in ['\x07', '\x1b\\']:
+            source = f'\x1b]8;;https://example.net/?token=syntheticSecret{terminator}HTTP_403\x1b]8;;{terminator}\r\n'
+            self.assertEqual(self.clean(source), 'HTTP_403\r\n')
+
+    def test_cli_ansi_output_and_residual_check(self):
+        data = codecs.BOM_UTF8 + b'\x1b[31mpassword\x1b[0m=syntheticSecret, status=500\r\n'
+        with tempfile.TemporaryDirectory() as folder:
+            source = Path(folder) / 'colored.log'
+            output = Path(folder) / 'redacted.log'
+            source.write_bytes(data)
+            with contextlib.redirect_stdout(io.StringIO()), contextlib.redirect_stderr(io.StringIO()):
+                self.assertEqual(rl.main([str(source), '--output', str(output), '--product', 'general']), 0)
+                self.assertEqual(rl.main([str(output), '--check', '--product', 'general']), 0)
+                self.assertEqual(rl.main([str(source), '--check', '--product', 'general']), 1)
+            self.assertEqual(source.read_bytes(), data)
+            self.assertEqual(output.read_bytes(), codecs.BOM_UTF8 + b'password=[REDACTED_SECRET_001], status=500\r\n')
+
     def test_installer_preserves_root_and_generic_user_prose(self):
         source = ('2026-10-01 12:00:00.000 User privileges: Administrative\r\n'
                   'Install mode root key: HKEY_LOCAL_MACHINE\r\n'

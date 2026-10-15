@@ -33,6 +33,9 @@ WINDOWS_PATH = re.compile(r'(?i)\b[a-z](?::|%3a)(?:\\+|/|%5c)[^\r\n"\x27<>|]*')
 POSIX_PATH = re.compile(r'(?<![\w:])/(?:Users|home|storage|sdcard|data/user|tmp|mnt)/[^\r\n"\x27<>|]*')
 FIELD = re.compile(r'(?<![\w:-])(?P<key>"(?:\\.|[^"\\\r\n])*"|\x27[^\x27\r\n]*\x27|(?i:Install[ \t]+mode[ \t]+root[ \t]+key)|[A-Za-z_][\w.-]{0,65})(?P<sep>\s*[:=]\s*)')
 DECODER = json.JSONDecoder()
+# Remove terminal CSI controls and OSC metadata, including hyperlink targets.
+# Do this before matching: masking changes boundaries and can hide credentials.
+ANSI_ESCAPE = re.compile(r'\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b\r\n]*(?:\x07|\x1b\\))')
 # These names also occur as roles, labels and ordinary words in diagnostic prose.
 AMBIGUOUS_USERNAMES = {'user', 'admin', 'administrator', 'guest', 'root', 'system', 'default', 'public'}
 REGISTRY_ROOTS = {'HKEY_CLASSES_ROOT', 'HKEY_CURRENT_USER', 'HKEY_LOCAL_MACHINE',
@@ -428,6 +431,7 @@ class Redactor:
         return spans, end
 
     def assignments(self, text):
+        text = ANSI_ESCAPE.sub('', text)
         edits = []
         occupied = 0
         # Query values are handled by url(), never by free-text field parsing.
@@ -499,6 +503,7 @@ class Redactor:
         return ''.join(chunks)
 
     def scrub(self, text, detect=True):
+        text = ANSI_ESCAPE.sub('', text)
         if detect:
             self.activate(text)
         # Redact PEM bodies before they can leak through line-oriented matching.
@@ -579,6 +584,7 @@ class Redactor:
         return text
 
     def transform(self, text, hint=''):
+        text = ANSI_ESCAPE.sub('', text)
         self.activate(text,hint)
         if 'media' in self.current_profiles and not self.redact_media_ids:
             self.media_ids.update(video for m in URL.finditer(text) if (video := youtube_video_id(m[0])))
