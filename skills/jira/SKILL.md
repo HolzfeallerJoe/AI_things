@@ -52,6 +52,14 @@ npx tsx your-script.ts
 - `jira.updateIssue(key, { fields: {...} })` - Update issue
 - `jira.deleteIssue(key)` - Delete issue
 - `jira.searchIssues({ jql, fields, maxResults })` - Search with JQL (uses `/search/jql` endpoint)
+- `jira.getIssueLinkTypes()` - Get available issue link types and their inward/outward descriptions
+- `jira.createIssueLink({ type, inwardIssue, outwardIssue })` - Link two issues with a relation
+
+### Linking tickets when creating an issue
+
+- When the request identifies Jira tickets related to a new issue, create actual Jira issue links to them. Do not put the relationship or ticket keys only in the new issue's description.
+- Call `jira.getIssueLinkTypes()` and choose the available relation whose inward/outward wording and direction match the intended relationship. Use the returned type ID or exact name; do not guess link types.
+- If the relation or link direction is unclear, ask the user before creating the link.
 
 ### JQL Builder
 ```typescript
