@@ -33,6 +33,9 @@ WINDOWS_PATH = re.compile(r'(?i)\b[a-z](?::|%3a)(?:\\+|/|%5c)[^\r\n"\x27<>|]*')
 POSIX_PATH = re.compile(r'(?<![\w:])/(?:Users|home|storage|sdcard|data/user|tmp|mnt)/[^\r\n"\x27<>|]*')
 FIELD = re.compile(r'(?<![\w:-])(?P<key>"(?:\\.|[^"\\\r\n])*"|\x27[^\x27\r\n]*\x27|(?i:Install[ \t]+mode[ \t]+root[ \t]+key)|[A-Za-z_][\w.-]{0,65})(?P<sep>\s*[:=]\s*)')
 DECODER = json.JSONDecoder()
+
+class RedactionError(ValueError):
+    """Failure with a fixed message that never contains log content."""
 # Remove terminal CSI controls and OSC metadata, including hyperlink targets.
 # Do this before matching: masking changes boundaries and can hide credentials.
 ANSI_ESCAPE = re.compile(r'\x1b(?:\[[0-?]*[ -/]*[@-~]|\][^\x07\x1b\r\n]*(?:\x07|\x1b\\))')
@@ -126,7 +129,7 @@ def decode(data, encoding=None):
         if data.startswith(bom):
             return data[len(bom):].decode(codec), codec, bom
     if b'\x00' in data:
-        raise ValueError('NUL bytes found; specify the encoding for a BOM-less Unicode log.')
+        raise RedactionError('NUL bytes found; specify the encoding for a BOM-less Unicode log.')
     return data.decode('utf-8'), 'utf-8', b''
 
 def load_rules(extra=None):
@@ -134,19 +137,19 @@ def load_rules(extra=None):
     if extra:
         custom = json.loads(Path(extra).read_text(encoding='utf-8-sig'))
         if not isinstance(custom,dict) or not isinstance(custom.get('fields',{}),dict) or not isinstance(custom.get('patterns',[]),list):
-            raise ValueError('Invalid custom rule schema')
+            raise RedactionError('Invalid custom rule schema')
         rules['profiles']['custom'] = {'detect': [], 'fields': custom.get('fields', {}), 'patterns': custom.get('patterns', [])}
     for profile in rules['profiles'].values():
         for category in profile['fields'].values():
             if not isinstance(category,str) or not re.fullmatch(r'[A-Z][A-Z0-9_]{0,30}',category):
-                raise ValueError('Invalid field category')
+                raise RedactionError('Invalid field category')
         for rule in profile.get('patterns',[]):
             try:
                 pattern=re.compile(rule['pattern'])
                 if 'value' not in pattern.groupindex or not re.fullmatch(r'[A-Z][A-Z0-9_]{0,30}',rule['category']):
-                    raise ValueError('Invalid contextual rule')
+                    raise RedactionError('Invalid contextual rule')
             except (KeyError,TypeError,re.error):
-                raise ValueError('Invalid contextual rule') from None
+                raise RedactionError('Invalid contextual rule') from None
     return rules
 
 class Redactor:
@@ -154,7 +157,7 @@ class Redactor:
         self.rules = rules or load_rules()
         unknown = set(profiles) - self.rules['profiles'].keys() - {'auto'}
         if unknown:
-            raise ValueError('Unknown product profile. See --list-products.')
+            raise RedactionError('Unknown product profile. See --list-products.')
         self.profiles = tuple(profiles) or ('auto',)
         self.mapping = {}
         self.sequence = Counter()
@@ -170,10 +173,10 @@ class Redactor:
             self.learn('USER', value, explicit=True)
         for item in values:
             if '=' not in item:
-                raise ValueError('--value requires CATEGORY=value.')
+                raise RedactionError('--value requires CATEGORY=value.')
             category, value = item.split('=', 1)
             if not re.fullmatch(r'[A-Z][A-Z0-9_]{0,30}', category):
-                raise ValueError('Invalid --value category.')
+                raise RedactionError('Invalid --value category.')
             self.learn(category, value, explicit=True)
 
     def activate(self, text, hint=''):
@@ -496,7 +499,7 @@ class Redactor:
         cursor = 0
         for start, end, value in edits:
             if start < cursor:
-                raise ValueError('Overlapping redaction spans')
+                raise RedactionError('Overlapping redaction spans')
             chunks.extend((text[cursor:start], value))
             cursor = end
         chunks.append(text[cursor:])
@@ -669,7 +672,7 @@ def main(argv=None):
             parser.error('--output needs one input and cannot be combined with --output-dir.')
         sources = [p.resolve(strict=True) for p in args.input]
         if len(set(sources)) != len(sources):
-            raise ValueError('Duplicate input files.')
+            raise RedactionError('Duplicate input files.')
         contents = [decode(p.read_bytes(), args.encoding) for p in sources]
         redactor = Redactor(args.product, rules, args.username, args.value, args.redact_media_ids)
         # Learn across the whole batch; maps stay in memory only.
@@ -683,7 +686,7 @@ def main(argv=None):
             return 1 if redactor.counts else 0
         destinations = [(args.output or (args.output_dir or source.parent)/(source.stem+'.redacted'+source.suffix)).resolve() for source in sources]
         if len(set(destinations)) != len(destinations) or any(p in sources or p.exists() for p in destinations):
-            raise ValueError('Outputs must be unique new files, separate from all inputs.')
+            raise RedactionError('Outputs must be unique new files, separate from all inputs.')
         # Check before writing anything. No raw mappings or snippets leave this process.
         verify = Redactor(args.product, rules, redact_media_ids=args.redact_media_ids)
         # A metadata record may be in one file and its source URL in another.
@@ -691,7 +694,7 @@ def main(argv=None):
             verify.transform(result,str(source))
         for source,result in zip(sources,results):
             if verify.transform(result,str(source)) != result:
-                raise ValueError('Residual redaction matches found; no output was written.')
+                raise RedactionError('Residual redaction matches found; no output was written.')
         payloads = [bom+result.encode(encoding) for result, (_,encoding,bom) in zip(results,contents)]
         if args.shift_timestamps:
             results=shift_timestamps(results)
@@ -706,6 +709,8 @@ def main(argv=None):
         return 0
     except UnicodeError:
         print('Lossless decoding failed; specify --encoding. No output was written.',file=sys.stderr)
+    except RedactionError as error:
+        print(f'Redaction failed: {error}',file=sys.stderr)
     except (OSError,ValueError,RecursionError) as error:
         # Do not repeat a malformed JSON value, secret, or customer path in diagnostics.
         print(f'Redaction failed ({type(error).__name__}); check inputs, rules, encoding and unused output paths.',file=sys.stderr)
