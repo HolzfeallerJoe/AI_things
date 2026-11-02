@@ -122,7 +122,6 @@ const issue = await jira.createIssue({
     issuetype: { name: 'Task' },
     summary: 'New task title',
     description: 'Task description',
-    priority: { name: 'Medium' },
   },
 });
 ```
@@ -140,6 +139,7 @@ if (done) {
 
 - **Always wrap in async function** - No top-level await support
 - **Always load `.env`** with the correct path using `config({ path: '...' })`
+- Do not set or change an issue's priority unless the user explicitly asks you to.
 - The wrapper uses Jira Cloud REST API v3 with the new `/search/jql` endpoint
 - All responses are fully typed in TypeScript
 - Use `JqlBuilder` for type-safe JQL query construction
